@@ -1,8 +1,14 @@
 import { MongoClient, Db, Collection } from 'mongodb'
 
-// Default to a local MongoDB if no URI is provided
-const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/Manheim'
-const options = {}
+// Use MongoDB Atlas URI from environment variables
+const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017'
+const options = {
+  // Add MongoDB Atlas optimizations
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  // Removed bufferMaxEntries as it's deprecated in newer MongoDB drivers
+}
 
 let client: MongoClient
 let clientPromise: Promise<MongoClient>
@@ -28,8 +34,28 @@ if (process.env.NODE_ENV === 'development') {
 export async function connectToDatabase(): Promise<{ db: Db; collection: Collection }> {
   try {
     const client = await clientPromise
-    const db = client.db('Manheim') // Your database name
+    
+    // For MongoDB Atlas, use lowercase database name to match existing
+    let dbName = 'manheim' // Use lowercase to match existing database
+    
+    if (uri.includes('mongodb+srv://')) {
+      // For Atlas connections, try to extract database name from URI
+      const urlParts = uri.split('/')
+      const afterHost = urlParts[3]
+      if (afterHost && !afterHost.startsWith('?')) {
+        dbName = afterHost.split('?')[0]
+      } else {
+        // Use existing lowercase database name
+        dbName = 'manheim'
+      }
+    }
+    
+    const db = client.db(dbName)
     const collection = db.collection('manheim_car_data') // Your collection name
+    
+    // Test the connection
+    await collection.findOne({})
+    console.log(`Successfully connected to MongoDB Atlas database: ${dbName}`)
     
     return { db, collection }
   } catch (error) {

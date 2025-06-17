@@ -6,11 +6,12 @@ interface Vehicle {
   id: string
   make: string
   models: string[]
+  model?: string
   year: string
   bodyStyle: string
   odometer: number
   bidPrice: number
-  buyNowPrice: number
+  buyNowPrice?: number
   buyable: boolean
   atAuction: boolean
   auctionEndTime: string
@@ -18,32 +19,38 @@ interface Vehicle {
   locationCity: string
   locationZipcode: string
   titleBrandings: string[]
-  salvageVehicle: boolean
+  salvageVehicle?: boolean
+  salvage?: boolean
   statuses: string[]
   vin: string
-  mmrPrice: number
+  mmr?: number
+  mmrPrice?: number
   conditionGradeNumeric: number
+  daysOnMarket?: number
 }
 
 interface VehicleCardProps {
   vehicle: Vehicle
+  listView?: boolean
 }
 
-export default function VehicleCard({ vehicle }: VehicleCardProps) {
+export default function VehicleCard({ vehicle, listView = false }: VehicleCardProps) {
   const [isWatchlisted, setIsWatchlisted] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   
   // Simplified time remaining calculation
   const timeRemaining = "2 hours"
-  const dealScore = ((vehicle.mmrPrice - vehicle.bidPrice) / vehicle.mmrPrice * 100).toFixed(0)
+  const dealScore = vehicle.mmrPrice && vehicle.bidPrice 
+    ? ((vehicle.mmrPrice - vehicle.bidPrice) / vehicle.mmrPrice * 100).toFixed(0)
+    : "0"
   const isGoodDeal = parseInt(dealScore) > 10
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'live': return 'status-live'
-      case 'ending': return 'status-ending'
-      case 'sold': return 'status-sold'
-      default: return 'status-live'
+      case 'live': return 'bg-green-600 text-white px-2 py-1 rounded text-xs'
+      case 'ending': return 'bg-orange-600 text-white px-2 py-1 rounded text-xs'
+      case 'sold': return 'bg-gray-600 text-white px-2 py-1 rounded text-xs'
+      default: return 'bg-blue-600 text-white px-2 py-1 rounded text-xs'
     }
   }
 
@@ -123,8 +130,136 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
     }
   }
 
+  if (listView) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+        <div className="flex items-center space-x-6">
+          {/* Vehicle Image */}
+          <div className="relative flex-shrink-0">
+            <div className="w-32 h-24 bg-gray-200 rounded-lg flex items-center justify-center">
+              <span className="text-gray-500 text-2xl">🚗</span>
+            </div>
+            
+            {/* Status Badge */}
+            <div className="absolute top-1 left-1">
+              <span className={vehicle.atAuction ? 'bg-green-600 text-white px-1 py-0.5 rounded text-xs' : 'bg-blue-600 text-white px-1 py-0.5 rounded text-xs'}>
+                {vehicle.atAuction ? 'Live' : 'Buy Now'}
+              </span>
+            </div>
+            
+            {/* MMR Analysis Badge */}
+            {vehicle.mmr && vehicle.bidPrice && (
+              <div className="absolute top-1 right-1">
+                {(() => {
+                  const percentage = Math.round(((vehicle.bidPrice - vehicle.mmr) / vehicle.mmr) * 100);
+                  const isGoodDeal = percentage < -10;
+                  return (
+                    <span className={`${isGoodDeal ? 'bg-green-600' : 'bg-gray-600'} text-white px-1 py-0.5 rounded text-xs font-medium`}>
+                      {percentage > 0 ? '+' : ''}{percentage}%
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Vehicle Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-lg truncate">
+                  {vehicle.year} {vehicle.make} {vehicle.models?.[0] || vehicle.model || 'Unknown Model'}
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  {vehicle.bodyStyle} • {vehicle.exteriorColor} • {vehicle.odometer?.toLocaleString() || 'N/A'} mi
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  VIN: {vehicle.vin?.slice(-8) || 'N/A'}
+                </p>
+                
+                {/* Title Status */}
+                {vehicle.salvageVehicle && (
+                  <div className="mt-1">
+                    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
+                      Salvage
+                    </span>
+                  </div>
+                )}
+                
+                {/* Location & Timing */}
+                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+                  <div className="flex items-center space-x-1">
+                    <span>📍</span>
+                    <span>{vehicle.locationCity || 'Unknown Location'}</span>
+                  </div>
+                  {vehicle.daysOnMarket && (
+                    <div className="flex items-center space-x-1">
+                      <span>📅</span>
+                      <span>{vehicle.daysOnMarket}d on market</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Pricing */}
+              <div className="text-right ml-4 flex-shrink-0">
+                <div className="space-y-1">
+                  <div>
+                    <div className="text-xs text-gray-600">Current Price</div>
+                    <div className="font-semibold text-lg">${vehicle.bidPrice?.toLocaleString() || 'N/A'}</div>
+                  </div>
+                  {vehicle.buyNowPrice && (
+                    <div>
+                      <div className="text-xs text-gray-600">Buy Now</div>
+                      <div className="font-semibold text-blue-600">${vehicle.buyNowPrice.toLocaleString()}</div>
+                    </div>
+                  )}
+                  {vehicle.mmr && (
+                    <div className="text-xs text-gray-500">
+                      MMR: ${vehicle.mmr.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
+            <button 
+              onClick={handleBuyNow}
+              disabled={isProcessing}
+              className="bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? 'Processing...' : 'Update Listing'}
+            </button>
+            <button 
+              onClick={handleBidOrView}
+              disabled={isProcessing}
+              className="bg-gray-200 text-gray-700 text-sm py-2 rounded hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? 'Processing...' : 'View Reports'}
+            </button>
+            
+            {/* Watchlist Button */}
+            <button 
+              onClick={handleWatchlist}
+              className={`p-2 border rounded transition-colors text-sm ${
+                isWatchlisted 
+                  ? 'text-red-500 border-red-300 bg-red-50' 
+                  : 'text-gray-400 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {isWatchlisted ? '❤️ Saved' : '♡ Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="card hover:shadow-lg transition-shadow">
+    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
       {/* Vehicle Image Placeholder */}
       <div className="relative mb-4">
         <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -133,16 +268,31 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
         
         {/* Status Badge */}
         <div className="absolute top-2 left-2">
-          <span className={getStatusColor(vehicle.statuses[0])}>
-            {vehicle.statuses[0]}
+          <span className={vehicle.atAuction ? 'bg-green-600 text-white px-2 py-1 rounded text-xs' : 'bg-blue-600 text-white px-2 py-1 rounded text-xs'}>
+            {vehicle.atAuction ? 'Live' : 'Buy Now'}
           </span>
         </div>
         
-        {/* Good Deal Badge */}
-        {isGoodDeal && (
+        {/* MMR Analysis Badge */}
+        {vehicle.mmr && vehicle.bidPrice && (
           <div className="absolute top-2 right-2">
-            <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-medium">
-              {dealScore}% below MMR
+            {(() => {
+              const percentage = Math.round(((vehicle.bidPrice - vehicle.mmr) / vehicle.mmr) * 100);
+              const isGoodDeal = percentage < -10;
+              return (
+                <span className={`${isGoodDeal ? 'bg-green-600' : 'bg-gray-600'} text-white px-2 py-1 rounded text-xs font-medium`}>
+                  {percentage > 0 ? '+' : ''}{percentage}% MMR
+                </span>
+              );
+            })()}
+          </div>
+        )}
+        
+        {/* Days on Market */}
+        {vehicle.daysOnMarket && (
+          <div className="absolute bottom-2 left-2">
+            <span className="bg-gray-800 text-white px-2 py-1 rounded text-xs">
+              {vehicle.daysOnMarket}d
             </span>
           </div>
         )}
@@ -162,10 +312,13 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
       <div className="space-y-3">
         <div>
           <h3 className="font-semibold text-lg">
-            {vehicle.year} {vehicle.make} {vehicle.models[0]}
+            {vehicle.year} {vehicle.make} {vehicle.models?.[0] || vehicle.model || 'Unknown Model'}
           </h3>
           <p className="text-gray-600 text-sm">
-            {vehicle.bodyStyle} • {vehicle.exteriorColor} • {vehicle.odometer.toLocaleString()} mi
+            {vehicle.bodyStyle} • {vehicle.exteriorColor} • {vehicle.odometer?.toLocaleString() || 'N/A'} mi
+          </p>
+          <p className="text-gray-500 text-xs mt-1">
+            VIN: {vehicle.vin?.slice(-8) || 'N/A'}
           </p>
         </div>
 
@@ -173,7 +326,7 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
         {vehicle.salvageVehicle && (
           <div className="flex items-center space-x-2">
             <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
-              {vehicle.titleBrandings.join(', ')}
+              Salvage
             </span>
           </div>
         )}
@@ -181,52 +334,52 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
         {/* Pricing */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Current Bid</span>
-            <span className="font-semibold text-lg">${vehicle.bidPrice.toLocaleString()}</span>
+            <span className="text-sm text-gray-600">Current Price</span>
+            <span className="font-semibold text-lg">${vehicle.bidPrice?.toLocaleString() || 'N/A'}</span>
           </div>
-          {vehicle.buyable && (
+          {vehicle.buyNowPrice && (
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Buy Now</span>
-              <span className="font-semibold text-primary-600">${vehicle.buyNowPrice.toLocaleString()}</span>
+              <span className="font-semibold text-blue-600">${vehicle.buyNowPrice?.toLocaleString() || 'N/A'}</span>
             </div>
           )}
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500">MMR Value</span>
-            <span className="text-gray-500">${vehicle.mmrPrice.toLocaleString()}</span>
-          </div>
+          {(vehicle.mmr || vehicle.mmrPrice) && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">MMR Value</span>
+              <span className="text-gray-500">${(vehicle.mmr || vehicle.mmrPrice)?.toLocaleString() || 'N/A'}</span>
+            </div>
+          )}
         </div>
 
         {/* Location & Timing */}
         <div className="flex justify-between items-center text-sm text-gray-600">
           <div className="flex items-center space-x-1">
             <span>📍</span>
-            <span>{vehicle.locationCity}</span>
+            <span>{vehicle.locationCity || 'Unknown Location'}</span>
           </div>
-          {vehicle.atAuction && (
+          {vehicle.daysOnMarket && (
             <div className="flex items-center space-x-1">
-              <span>⏰</span>
-              <span>Ends in {timeRemaining}</span>
+              <span>📅</span>
+              <span>{vehicle.daysOnMarket}d on market</span>
             </div>
           )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex space-x-2 pt-2">
-          {vehicle.buyable && (
-            <button 
-              onClick={handleBuyNow}
-              disabled={isProcessing}
-              className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? 'Processing...' : 'Buy Now'}
-            </button>
-          )}
+          <button 
+            onClick={handleBuyNow}
+            disabled={isProcessing}
+            className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? 'Processing...' : 'Update Listing'}
+          </button>
           <button 
             onClick={handleBidOrView}
             disabled={isProcessing}
-            className="btn-secondary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isProcessing ? 'Processing...' : (vehicle.atAuction ? 'Place Bid' : 'View Details')}
+            {isProcessing ? 'Processing...' : 'View Reports'}
           </button>
         </div>
       </div>
