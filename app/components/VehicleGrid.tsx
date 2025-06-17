@@ -6,6 +6,11 @@ import VehicleCard from './VehicleCard'
 interface VehicleGridProps {
   searchQuery: string
   filters: any
+  vehicles?: any[]
+  loading?: boolean
+  totalCount?: number
+  currentPage?: number
+  onPageChange?: (page: number) => void
 }
 
 // Keep mock data as fallback
@@ -78,101 +83,28 @@ const mockVehicles = [
   },
 ]
 
-export default function VehicleGrid({ searchQuery, filters }: VehicleGridProps) {
-  const [vehicles, setVehicles] = useState(mockVehicles)
-  const [loading, setLoading] = useState(true)
+export default function VehicleGrid({ 
+  searchQuery, 
+  filters, 
+  vehicles = mockVehicles,
+  loading = false,
+  totalCount = 0,
+  currentPage = 1,
+  onPageChange
+}: VehicleGridProps) {
   const [sortBy, setSortBy] = useState('bidPrice')
-  const [filteredVehicles, setFilteredVehicles] = useState(mockVehicles)
+  const [filteredVehicles, setFilteredVehicles] = useState(vehicles)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
 
   useEffect(() => {
-    async function fetchVehicles() {
-      try {
-        setLoading(true)
-        
-        // Build query parameters
-        const params = new URLSearchParams()
-        if (searchQuery) params.append('search', searchQuery)
-        if (filters.priceMin) params.append('priceMin', filters.priceMin)
-        if (filters.priceMax) params.append('priceMax', filters.priceMax)
-        if (filters.make) params.append('make', filters.make)
-        if (filters.bodyStyle) params.append('bodyStyle', filters.bodyStyle)
-        if (filters.yearMin) params.append('yearMin', filters.yearMin)
-        if (filters.yearMax) params.append('yearMax', filters.yearMax)
-        if (filters.salvageOnly) params.append('salvageOnly', 'true')
-        if (filters.auctionEnding) params.append('auctionEnding', 'true')
-        if (filters.buyItNow) params.append('buyItNow', 'true')
-        if (filters.quickFilter) params.append('quickFilter', filters.quickFilter)
-
-        const response = await fetch(`/api/vehicles?${params.toString()}`)
-        if (response.ok) {
-          const data = await response.json()
-          setVehicles(data.vehicles || mockVehicles)
-        } else {
-          console.log('API not available, using mock data')
-          setVehicles(mockVehicles)
-        }
-      } catch (error) {
-        console.log('Failed to fetch vehicles, using mock data:', error)
-        setVehicles(mockVehicles)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchVehicles()
-  }, [searchQuery, filters])
-
-  useEffect(() => {
-    // Apply client-side filtering to mock data if needed
+    // Apply client-side filtering and sorting
     let filtered = vehicles.filter(vehicle => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
-        const searchableText = `${vehicle.make} ${vehicle.models[0]} ${vehicle.year} ${vehicle.vin}`.toLowerCase()
+        const searchableText = `${vehicle.make} ${vehicle.models?.[0] || ''} ${vehicle.year} ${vehicle.vin}`.toLowerCase()
         if (!searchableText.includes(query)) return false
       }
-
-      // Price filters
-      if (filters.priceMin && vehicle.bidPrice < parseInt(filters.priceMin)) return false
-      if (filters.priceMax && vehicle.bidPrice > parseInt(filters.priceMax)) return false
-
-      // Make filter
-      if (filters.make && vehicle.make !== filters.make) return false
-
-      // Body style filter
-      if (filters.bodyStyle && vehicle.bodyStyle !== filters.bodyStyle) return false
-
-      // Year filters
-      if (filters.yearMin && parseInt(vehicle.year) < parseInt(filters.yearMin)) return false
-      if (filters.yearMax && parseInt(vehicle.year) > parseInt(filters.yearMax)) return false
-
-      // Special filters
-      if (filters.salvageOnly && !vehicle.salvageVehicle) return false
-      if (filters.buyItNow && !vehicle.buyable) return false
-
-      // Quick filters
-      if (filters.quickFilter) {
-        switch (filters.quickFilter) {
-          case 'live':
-            if (!vehicle.atAuction) return false
-            break
-          case 'ending':
-            // For demo, show vehicles ending within 24 hours
-            const endTime = new Date(vehicle.auctionEndTime)
-            const now = new Date()
-            const hoursUntilEnd = (endTime.getTime() - now.getTime()) / (1000 * 60 * 60)
-            if (hoursUntilEnd > 24) return false
-            break
-          case 'buyNow':
-            if (!vehicle.buyable) return false
-            break
-          case 'goodDeals':
-            const dealScore = ((vehicle.mmrPrice - vehicle.bidPrice) / vehicle.mmrPrice * 100)
-            if (dealScore < 10) return false
-            break
-        }
-      }
-
       return true
     })
 
@@ -196,9 +128,38 @@ export default function VehicleGrid({ searchQuery, filters }: VehicleGridProps) 
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        <span className="ml-3 text-gray-600">Loading vehicles...</span>
+      <div className="space-y-4">
+        {/* Loading state with view toggle */}
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Loading vehicles...</h2>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">View:</span>
+              <div className="flex border border-gray-300 rounded">
+                <button className="px-3 py-1 text-sm bg-white text-gray-600">Grid</button>
+                <button className="px-3 py-1 text-sm bg-primary-600 text-white">List</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-sm p-4 animate-pulse">
+              <div className="flex items-center space-x-6">
+                <div className="w-32 h-24 bg-gray-200 rounded-lg"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </div>
+                <div className="w-32 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -208,9 +169,36 @@ export default function VehicleGrid({ searchQuery, filters }: VehicleGridProps) 
       {/* Results Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">
-          {filteredVehicles.length} Vehicles Found
+          {totalCount > 0 ? `${totalCount.toLocaleString()} Vehicles Found` : `${filteredVehicles.length} Vehicles Found`}
         </h2>
         <div className="flex items-center space-x-4">
+          {/* View Toggle */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">View:</span>
+            <div className="flex border border-gray-300 rounded">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1 text-sm ${
+                  viewMode === 'grid' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Grid
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 text-sm ${
+                  viewMode === 'list' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                List
+              </button>
+            </div>
+          </div>
+          
           <span className="text-sm text-gray-600">Sort by:</span>
           <select 
             className="border border-gray-300 rounded px-3 py-1 text-sm"
@@ -225,12 +213,20 @@ export default function VehicleGrid({ searchQuery, filters }: VehicleGridProps) 
         </div>
       </div>
 
-      {/* Vehicle Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredVehicles.map((vehicle) => (
-          <VehicleCard key={vehicle.id} vehicle={vehicle} />
-        ))}
-      </div>
+      {/* Vehicle Display */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredVehicles.map((vehicle) => (
+            <VehicleCard key={vehicle.id} vehicle={vehicle} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredVehicles.map((vehicle) => (
+            <VehicleCard key={vehicle.id} vehicle={vehicle} listView={true} />
+          ))}
+        </div>
+      )}
 
       {/* No Results */}
       {filteredVehicles.length === 0 && (
@@ -240,12 +236,45 @@ export default function VehicleGrid({ searchQuery, filters }: VehicleGridProps) 
         </div>
       )}
 
-      {/* Load More Button */}
-      {filteredVehicles.length > 0 && (
-        <div className="text-center pt-8">
-          <button className="btn-primary px-8 py-3 hover:bg-primary-700 transition-colors">
-            Load More Vehicles
-          </button>
+      {/* Pagination */}
+      {totalCount > 12 && onPageChange && (
+        <div className="flex justify-center mt-8">
+          <div className="flex space-x-2">
+            {currentPage > 1 && (
+              <button
+                onClick={() => onPageChange(currentPage - 1)}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Previous
+              </button>
+            )}
+            
+            {[...Array(Math.min(5, Math.ceil(totalCount / 12)))].map((_, i) => {
+              const page = i + 1
+              return (
+                <button
+                  key={page}
+                  onClick={() => onPageChange(page)}
+                  className={`px-4 py-2 border rounded ${
+                    currentPage === page
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              )
+            })}
+            
+            {currentPage < Math.ceil(totalCount / 12) && (
+              <button
+                onClick={() => onPageChange(currentPage + 1)}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Next
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

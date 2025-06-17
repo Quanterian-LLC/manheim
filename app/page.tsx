@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
+import VehicleGrid from './components/VehicleGrid'
 
 interface Vehicle {
   id: string
@@ -292,10 +294,10 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Advanced Filters Sidebar */}
-          <div className="lg:col-span-1">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8">
+          {/* Sidebar */}
+          <div className="w-80 flex-shrink-0 space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6 max-h-screen overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Advanced Filters</h2>
@@ -529,13 +531,16 @@ export default function Home() {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">
-            {/* Results Header */}
-            <div className="flex items-center justify-between mb-6">
+          <div className="flex-1">
+            {/* Header with count and sorting */}
+            <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-xl font-semibold">
-                  {loading ? 'Loading...' : `${totalCount.toLocaleString()} Vehicles Found`}
-                </h2>
+                <h1 className="text-2xl font-bold text-gray-900">Manheim Inventory</h1>
+                {!loading && (
+                  <p className="text-gray-600 mt-1">
+                    {totalCount.toLocaleString()} vehicles found
+                  </p>
+                )}
                 {currentPage > 1 && (
                   <p className="text-sm text-gray-600">
                     Page {currentPage} of {Math.ceil(totalCount / 12)}
@@ -544,192 +549,16 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Vehicle Grid */}
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
-                    <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  </div>
-                ))}
-              </div>
-            ) : vehicles.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No vehicles found matching your criteria.</p>
-                <button
-                  onClick={clearFilters}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {vehicles.map((vehicle) => {
-                    const mmrAnalysis = calculateMMRAnalysis(vehicle)
-                    
-                    return (
-                      <div key={vehicle.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
-                        {/* Vehicle Image Placeholder */}
-                        <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-4 relative">
-                          <span className="text-gray-500 text-4xl">🚗</span>
-                          
-                          {/* MMR Analysis Badge */}
-                          <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium text-white bg-${mmrAnalysis.color}-600`}>
-                            {mmrAnalysis.percentage > 0 ? '+' : ''}{mmrAnalysis.percentage}% MMR
-                          </div>
-                          
-                          {/* Days on Market */}
-                          {vehicle.daysOnMarket && (
-                            <div className="absolute top-2 left-2 px-2 py-1 rounded text-xs bg-gray-800 text-white">
-                              {vehicle.daysOnMarket}d
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Vehicle Info */}
-                        <div className="space-y-3">
-                          <div>
-                            <h3 className="font-semibold text-lg">
-                              {vehicle.year} {vehicle.make} {vehicle.models?.[0] || 'Unknown'}
-                            </h3>
-                            <p className="text-gray-600 text-sm">
-                              VIN: {vehicle.vin?.slice(-8) || 'N/A'} • {vehicle.odometer?.toLocaleString()} mi
-                            </p>
-                          </div>
-
-                          {/* Pricing Analysis */}
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Current Price</span>
-                              <span className="font-semibold text-lg">${vehicle.bidPrice?.toLocaleString()}</span>
-                            </div>
-                            
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">MMR Value</span>
-                              <span className="text-sm text-gray-800">${vehicle.mmr?.toLocaleString()}</span>
-                            </div>
-                            
-                            {vehicle.buyNowPrice && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">Buy Now</span>
-                                <span className="font-semibold text-blue-600">${vehicle.buyNowPrice.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Condition & Reports */}
-                          <div className="flex justify-between items-center text-sm">
-                            <div className="flex items-center gap-2">
-                              {vehicle.conditionGrade && (
-                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                                  Grade: {vehicle.conditionGrade}
-                                </span>
-                              )}
-                              {vehicle.carfaxStatus === 'clean' && (
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                  Clean Carfax
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Status Indicators */}
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">📍 {vehicle.locationCity}</span>
-                            <div className="flex gap-1">
-                              {vehicle.atAuction && (
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                  Live
-                                </span>
-                              )}
-                              {vehicle.salvage && (
-                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
-                                  Salvage
-                                </span>
-                              )}
-                              {mmrAnalysis.status === 'great_deal' && (
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                  Great Deal
-                                </span>
-                              )}
-                              {mmrAnalysis.status === 'overpriced' && (
-                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
-                                  Overpriced
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex space-x-2 pt-2">
-                            <button className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors text-sm">
-                              Update Listing
-                            </button>
-                            <button className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors text-sm">
-                              View Reports
-                            </button>
-                          </div>
-                          
-                          {/* Price Reduction Suggestion */}
-                          {mmrAnalysis.status === 'overpriced' && (
-                            <div className="bg-red-50 border border-red-200 rounded p-2 text-sm">
-                              <p className="text-red-800 font-medium">💡 Price Reduction Suggested</p>
-                              <p className="text-red-600">Consider reducing by ${Math.abs(vehicle.bidPrice - vehicle.mmr).toLocaleString()}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Pagination */}
-                {totalCount > 12 && (
-                  <div className="flex justify-center mt-8">
-                    <div className="flex space-x-2">
-                      {currentPage > 1 && (
-                        <button
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                        >
-                          Previous
-                        </button>
-                      )}
-                      
-                      {[...Array(Math.min(5, Math.ceil(totalCount / 12)))].map((_, i) => {
-                        const page = i + 1
-                        return (
-                          <button
-                            key={page}
-                            onClick={() => handlePageChange(page)}
-                            className={`px-4 py-2 border rounded ${
-                              currentPage === page
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'border-gray-300 hover:bg-gray-50'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        )
-                      })}
-                      
-                      {currentPage < Math.ceil(totalCount / 12) && (
-                        <button
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                        >
-                          Next
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+            {/* Vehicle Grid Component */}
+            <VehicleGrid 
+              searchQuery={filters.search}
+              filters={filters}
+              vehicles={vehicles}
+              loading={loading}
+              totalCount={totalCount}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+            />
           </div>
         </div>
       </div>
