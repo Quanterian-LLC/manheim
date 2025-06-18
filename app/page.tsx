@@ -33,6 +33,7 @@ interface Vehicle {
   sellerName?: string
   mComVdpUrl?: string
   status?: string
+  conditionReportUrl?: string
 }
 
 interface Filters {
