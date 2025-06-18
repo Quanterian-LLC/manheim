@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Sorting
-    const sortBy = searchParams.get('sortBy') || 'mmr_difference'
+    const sortBy = searchParams.get('sortBy') || 'composite_score'
 
     // Search and basic filters
     const search = searchParams.get('search') || ''
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
         break
       default:
         useAggregationSort = true
-        aggregationSortCriteria = { mmrDifference: -1 } // Default to MMR difference high to low
+        aggregationSortCriteria = { compositeScore: -1 } // Default to composite score high to low
     }
 
     try {
@@ -581,7 +581,10 @@ export async function GET(request: NextRequest) {
             const scoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (b.conditionGrade || 0)
             return scoreB - scoreA // Highest composite score first
           default:
-            return (b.mmrDifference || 0) - (a.mmrDifference || 0) // Default to MMR difference high to low
+            // Default to composite score (best deals)
+            const defaultScoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (a.conditionGrade || 0)
+            const defaultScoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (b.conditionGrade || 0)
+            return defaultScoreB - defaultScoreA // Highest composite score first
         }
       })
 
