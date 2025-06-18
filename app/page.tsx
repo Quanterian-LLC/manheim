@@ -67,7 +67,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [sortBy, setSortBy] = useState('mmr_difference') // Default sort by MMR difference high to low
+  const [sortBy, setSortBy] = useState('composite_score') // Default sort by composite score (best deals)
   
   const [filters, setFilters] = useState<Filters>({
     search: '',
