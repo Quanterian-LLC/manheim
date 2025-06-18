@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import VehicleGrid from './components/VehicleGrid'
 
@@ -17,9 +17,11 @@ interface Vehicle {
   buyNowPrice?: number
   buyable: boolean
   atAuction: boolean
+  auctionEndTime?: string
+  auctionStartTime?: string
   salvage: boolean
-  mmr: number
   vin: string
+  mmrDifference?: number // buyNowPrice - mmrPrice
   conditionGrade?: number
   carfaxStatus?: string
   autoCheckStatus?: string
@@ -28,6 +30,9 @@ interface Vehicle {
   bidCount?: number
   listingStatus?: string
   lastPriceUpdate?: string
+  sellerName?: string
+  mComVdpUrl?: string
+  status?: string
 }
 
 interface Filters {
@@ -43,9 +48,6 @@ interface Filters {
   salvageOnly: boolean
   buyNowOnly: boolean
   auctionOnly: boolean
-  // MMR-based filters
-  mmrComparison: string // 'below', 'above', 'near'
-  mmrPercentage: string // percentage difference
   // Condition filters
   conditionGradeMin: string
   carfaxClean: boolean
@@ -56,6 +58,7 @@ interface Filters {
   priceReductionNeeded: boolean // overpriced based on MMR
   daysOnMarketMin: string
   daysOnMarketMax: string
+  conditionGradeMax: string
 }
 
 export default function Home() {
@@ -64,7 +67,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [sortBy, setSortBy] = useState('mmr_value') // Default sort by MMR value
+  const [sortBy, setSortBy] = useState('mmr_difference') // Default sort by MMR difference high to low
   
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -79,8 +82,6 @@ export default function Home() {
     salvageOnly: false,
     buyNowOnly: false,
     auctionOnly: false,
-    mmrComparison: '',
-    mmrPercentage: '',
     conditionGradeMin: '',
     carfaxClean: false,
     autoCheckClean: false,
@@ -88,7 +89,8 @@ export default function Home() {
     needsRelisting: false,
     priceReductionNeeded: false,
     daysOnMarketMin: '',
-    daysOnMarketMax: ''
+    daysOnMarketMax: '',
+    conditionGradeMax: ''
   })
 
   const [availableFilters, setAvailableFilters] = useState({
@@ -97,52 +99,32 @@ export default function Home() {
     locations: [] as string[]
   })
 
-  // Calculate MMR analysis for a vehicle
-  const calculateMMRAnalysis = (vehicle: Vehicle) => {
-    // Better null/undefined checking
-    if (!vehicle.mmr || vehicle.mmr === null || !vehicle.bidPrice || vehicle.bidPrice === null) {
-      console.log(`MMR calculation failed for vehicle ${vehicle.id}: mmr=${vehicle.mmr}, bidPrice=${vehicle.bidPrice}`)
-      return { percentage: 0, status: 'unknown', color: 'gray' }
-    }
-    
-    const percentage = ((vehicle.bidPrice - vehicle.mmr) / vehicle.mmr * 100)
-    let status = 'fair'
-    let color = 'yellow'
-    
-    if (percentage < -15) {
-      status = 'great_deal'
-      color = 'green'
-    } else if (percentage < -5) {
-      status = 'good_deal'
-      color = 'blue'
-    } else if (percentage > 15) {
-      status = 'overpriced'
-      color = 'red'
-    } else if (percentage > 5) {
-      status = 'above_market'
-      color = 'orange'
-    }
-    
-    console.log(`MMR calculation for vehicle ${vehicle.id}: bidPrice=${vehicle.bidPrice}, mmr=${vehicle.mmr}, percentage=${Math.round(percentage)}%`)
-    return { percentage: Math.round(percentage), status, color }
-  }
-
   // Fetch vehicles with filters
   const fetchVehicles = async (page = 1) => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({
+      // Build only necessary parameters (exclude empty values)
+      const params: Record<string, string> = {
         page: page.toString(),
         limit: '12',
-        sortBy: sortBy,
-        ...Object.fromEntries(
-          Object.entries(filters).filter(([_, value]) => 
-            value !== '' && value !== false
-          )
-        )
+        sortBy: sortBy
+      }
+
+      // Add only non-empty filters to reduce payload
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== '' && value !== false) {
+          params[key] = value.toString()
+        }
       })
 
-      const response = await fetch(`/api/vehicles?${params}`)
+      const searchParams = new URLSearchParams(params)
+      
+      const response = await fetch(`/api/vehicles?${searchParams}`, {
+        headers: {
+          'Cache-Control': 'max-age=30' // Client-side caching
+        }
+      })
+      
       if (response.ok) {
         const data = await response.json()
         setVehicles(data.vehicles || [])
@@ -152,7 +134,7 @@ export default function Home() {
           setAvailableFilters(data.filterOptions)
         }
       } else {
-        setError('Failed to fetch vehicles')
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
     } catch (err) {
       setError('Error loading vehicles')
@@ -170,7 +152,7 @@ export default function Home() {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
       fetchVehicles(1)
-    }, 500)
+    }, 300)
 
     return () => clearTimeout(timeoutId)
   }, [filters, sortBy])
@@ -193,8 +175,6 @@ export default function Home() {
       salvageOnly: false,
       buyNowOnly: false,
       auctionOnly: false,
-      mmrComparison: '',
-      mmrPercentage: '',
       conditionGradeMin: '',
       carfaxClean: false,
       autoCheckClean: false,
@@ -202,7 +182,8 @@ export default function Home() {
       needsRelisting: false,
       priceReductionNeeded: false,
       daysOnMarketMin: '',
-      daysOnMarketMax: ''
+      daysOnMarketMax: '',
+      conditionGradeMax: ''
     })
   }
 
@@ -220,8 +201,6 @@ export default function Home() {
       Model: v.models?.[0] || '',
       'Current Price': v.bidPrice,
       'Buy Now Price': v.buyNowPrice || '',
-      'MMR Value': v.mmr,
-      'MMR Difference %': calculateMMRAnalysis(v).percentage,
       'Condition Grade': v.conditionGrade || '',
       'Carfax Status': v.carfaxStatus || '',
       'Days on Market': v.daysOnMarket || '',
@@ -239,7 +218,7 @@ export default function Home() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `manheim_inventory_${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `autobuyer_inventory_${new Date().toISOString().split('T')[0]}.csv`
     a.click()
   }
 
@@ -267,7 +246,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <h1 className="text-2xl font-bold text-blue-600">
-              Manheim Inventory Management
+              AutoBuyer Inventory Management
             </h1>
             
             <div className="flex items-center gap-4">
@@ -320,49 +299,16 @@ export default function Home() {
                     onChange={(e) => setSortBy(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="mmr_value">MMR Value Analysis</option>
+                    <option value="mmr_difference">MMR Difference: High to Low (Best Deals)</option>
+                    <option value="mmr_difference_low">MMR Difference: Low to High</option>
+                    <option value="composite_score">🎯 Best Deals (Low Price + High Condition)</option>
+                    <option value="condition_grade_high">Condition Grade: High to Low</option>
+                    <option value="condition_grade_low">Condition Grade: Low to High</option>
                     <option value="price_low">Price: Low to High</option>
                     <option value="price_high">Price: High to Low</option>
                     <option value="days_on_market">Days on Market</option>
-                    <option value="condition_grade">Condition Grade</option>
                     <option value="newest">Newest Listings</option>
                   </select>
-                </div>
-
-                {/* MMR Analysis Filters */}
-                <div className="border-t pt-4">
-                  <h3 className="font-medium text-gray-900 mb-3">MMR Analysis</h3>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Price vs MMR
-                      </label>
-                      <select
-                        value={filters.mmrComparison}
-                        onChange={(e) => handleFilterChange('mmrComparison', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">All Vehicles</option>
-                        <option value="below">Below MMR (Good Deals)</option>
-                        <option value="above">Above MMR (Overpriced)</option>
-                        <option value="near">Near MMR (±5%)</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        MMR Difference %
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="e.g., 15 for 15%"
-                        value={filters.mmrPercentage}
-                        onChange={(e) => handleFilterChange('mmrPercentage', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 {/* Condition & Reports */}
@@ -526,6 +472,58 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+
+                {/* Condition Grade Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Condition Grade Range
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min (1.0)"
+                      min="1"
+                      max="5"
+                      step="0.1"
+                      value={filters.conditionGradeMin}
+                      onChange={(e) => setFilters({...filters, conditionGradeMin: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max (5.0)"
+                      min="1"
+                      max="5"
+                      step="0.1"
+                      value={filters.conditionGradeMax}
+                      onChange={(e) => setFilters({...filters, conditionGradeMax: e.target.value})}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Checkboxes */}
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.carfaxClean}
+                      onChange={(e) => handleFilterChange('carfaxClean', e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Clean Carfax Only</span>
+                  </label>
+                  
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.autoCheckClean}
+                      onChange={(e) => handleFilterChange('autoCheckClean', e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Clean AutoCheck Only</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -535,7 +533,7 @@ export default function Home() {
             {/* Header with count and sorting */}
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Manheim Inventory</h1>
+                <h1 className="text-2xl font-bold text-gray-900">AutoBuyer Inventory</h1>
                 {!loading && (
                   <p className="text-gray-600 mt-1">
                     {totalCount.toLocaleString()} vehicles found

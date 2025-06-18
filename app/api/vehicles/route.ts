@@ -5,38 +5,37 @@ import { connectToDatabase } from '@/lib/mongodb'
 const mockVehicles = [
   {
     id: "OVE.BCAA.399641951",
-    make: "Ford",
-    models: ["Transit Connect"],
-    year: "2013",
-    bodyStyle: "Cargo Van",
-    odometer: 82702,
-    bidPrice: 4500,
-    buyNowPrice: 6700,
-    buyable: true,
-    atAuction: false,
-    auctionEndTime: "2025-06-16T20:00:00Z",
-    exteriorColor: "White",
-    locationCity: "Hayward",
-    locationZipcode: "94544",
-    titleBrandings: ["Salvage"],
-    salvageVehicle: true,
-    statuses: ["Live"],
-    vin: "NM0LS7CNXDT154708",
-    mmrPrice: 4350,
-    conditionGradeNumeric: 2.1,
-  },
-  {
-    id: "OVE.BCAA.399641952",
     make: "Toyota",
     models: ["Camry"],
-    year: "2020",
+    year: "2021",
     bodyStyle: "Sedan",
-    odometer: 45000,
+    odometer: 25000,
     bidPrice: 18500,
     buyNowPrice: 22000,
     buyable: true,
-    atAuction: true,
-    auctionEndTime: "2025-06-14T15:30:00Z",
+    atAuction: false,
+    auctionEndTime: "2025-06-15T18:00:00Z",
+    exteriorColor: "White",
+    locationCity: "Dallas",
+    locationZipcode: "75201",
+    titleBrandings: ["Clean"],
+    salvageVehicle: false,
+    statuses: ["Live"],
+    vin: "4T1G11AK1LU123455",
+    conditionGradeNumeric: 3.5,
+  },
+  {
+    id: "OVE.BCAA.399641952",
+    make: "Honda",
+    models: ["Accord"],
+    year: "2020",
+    bodyStyle: "Sedan",
+    odometer: 32000,
+    bidPrice: 17200,
+    buyNowPrice: 20500,
+    buyable: true,
+    atAuction: false,
+    auctionEndTime: "2025-06-15T18:00:00Z",
     exteriorColor: "Silver",
     locationCity: "Los Angeles",
     locationZipcode: "90210",
@@ -44,7 +43,6 @@ const mockVehicles = [
     salvageVehicle: false,
     statuses: ["Live"],
     vin: "4T1G11AK1LU123456",
-    mmrPrice: 19500,
     conditionGradeNumeric: 3.8,
   },
   {
@@ -66,7 +64,6 @@ const mockVehicles = [
     salvageVehicle: false,
     statuses: ["Live"],
     vin: "WBA5A7C50KD123456",
-    mmrPrice: 26000,
     conditionGradeNumeric: 4.2,
   },
 ]
@@ -81,7 +78,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Sorting
-    const sortBy = searchParams.get('sortBy') || 'mmr_value'
+    const sortBy = searchParams.get('sortBy') || 'mmr_difference'
 
     // Search and basic filters
     const search = searchParams.get('search') || ''
@@ -97,12 +94,9 @@ export async function GET(request: NextRequest) {
     const buyNowOnly = searchParams.get('buyNowOnly') === 'true'
     const auctionOnly = searchParams.get('auctionOnly') === 'true'
 
-    // MMR-based filters
-    const mmrComparison = searchParams.get('mmrComparison') || ''
-    const mmrPercentage = searchParams.get('mmrPercentage') || ''
-
     // Condition filters
     const conditionGradeMin = searchParams.get('conditionGradeMin') || ''
+    const conditionGradeMax = searchParams.get('conditionGradeMax') || ''
     const carfaxClean = searchParams.get('carfaxClean') === 'true'
     const autoCheckClean = searchParams.get('autoCheckClean') === 'true'
 
@@ -145,38 +139,12 @@ export async function GET(request: NextRequest) {
     if (buyNowOnly) query.buyable = true
     if (auctionOnly) query.atAuction = true
 
-    // MMR-based filters
-    if (mmrComparison && mmrComparison !== '') {
-      // Add calculated field for MMR comparison - use mmrPrice field from MongoDB
-      if (mmrComparison === 'below') {
-        query.$expr = { $lt: ['$bidPrice', '$mmrPrice'] }
-      } else if (mmrComparison === 'above') {
-        query.$expr = { $gt: ['$bidPrice', '$mmrPrice'] }
-      } else if (mmrComparison === 'near') {
-        // Within 5% of MMR
-        query.$expr = {
-          $and: [
-            { $gte: ['$bidPrice', { $multiply: ['$mmrPrice', 0.95] }] },
-            { $lte: ['$bidPrice', { $multiply: ['$mmrPrice', 1.05] }] }
-          ]
-        }
-      }
-    }
-
-    if (mmrPercentage && mmrPercentage !== '') {
-      const percentage = parseFloat(mmrPercentage) / 100
-      if (percentage > 0) {
-        // Price is X% above MMR - use mmrPrice field
-        query.$expr = { $gte: ['$bidPrice', { $multiply: ['$mmrPrice', 1 + percentage] }] }
-      } else if (percentage < 0) {
-        // Price is X% below MMR - use mmrPrice field
-        query.$expr = { $lte: ['$bidPrice', { $multiply: ['$mmrPrice', 1 + percentage] }] }
-      }
-    }
-
     // Condition filters
     if (conditionGradeMin) {
       query.conditionGradeNumeric = { $gte: parseFloat(conditionGradeMin) }
+    }
+    if (conditionGradeMax) {
+      query.conditionGradeNumeric = { ...query.conditionGradeNumeric, $lte: parseFloat(conditionGradeMax) }
     }
     if (carfaxClean) {
       query.carfaxStatus = 'clean'
@@ -201,8 +169,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (priceReductionNeeded) {
-      // Vehicles priced more than 15% above MMR - use mmrPrice field
-      query.$expr = { $gte: ['$bidPrice', { $multiply: ['$mmrPrice', 1.15] }] }
+      // Vehicles that have been on market for a long time (indicating pricing issues)
+      query.daysOnMarket = { $gte: 20 }
     }
 
     if (daysOnMarketMin || daysOnMarketMax) {
@@ -212,29 +180,33 @@ export async function GET(request: NextRequest) {
     }
 
     // Build sort criteria
-    let sortCriteria: any = {}
+    let useAggregationSort = false
+    let aggregationSortCriteria: any = {}
+    
     switch (sortBy) {
-      case 'mmr_value':
-        // Sort by MMR value difference (best deals first) - use mmrPrice field
-        sortCriteria = { mmrPrice: -1, bidPrice: 1 }
+      case 'mmr_difference':
+        useAggregationSort = true
+        aggregationSortCriteria = { mmrDifference: -1 } // High to low
         break
-      case 'price_low':
-        sortCriteria = { bidPrice: 1 }
+      case 'mmr_difference_low':
+        useAggregationSort = true
+        aggregationSortCriteria = { mmrDifference: 1 } // Low to high
         break
-      case 'price_high':
-        sortCriteria = { bidPrice: -1 }
+      case 'condition_grade_high':
+        useAggregationSort = true
+        aggregationSortCriteria = { conditionGradeNumeric: -1 } // High to low
         break
-      case 'days_on_market':
-        sortCriteria = { daysOnMarket: -1 }
+      case 'condition_grade_low':
+        useAggregationSort = true
+        aggregationSortCriteria = { conditionGradeNumeric: 1 } // Low to high
         break
-      case 'condition_grade':
-        sortCriteria = { conditionGradeNumeric: -1 }
-        break
-      case 'newest':
-        sortCriteria = { listingDate: -1 }
+      case 'composite_score':
+        useAggregationSort = true
+        aggregationSortCriteria = { compositeScore: -1 } // High to low
         break
       default:
-        sortCriteria = { bidPrice: -1 }
+        useAggregationSort = true
+        aggregationSortCriteria = { mmrDifference: -1 } // Default to MMR difference high to low
     }
 
     try {
@@ -242,18 +214,63 @@ export async function GET(request: NextRequest) {
       const { db } = await connectToDatabase()
       const collection = db.collection('manheim_car_data')
 
-      // Get total count for pagination
-      const totalCount = await collection.countDocuments(query)
+      // Build aggregation pipeline
+      let pipeline: any[] = [{ $match: query }]
 
-      // Get vehicles with pagination and sorting
-      const vehicles = await collection
-        .find(query)
-        .sort(sortCriteria)
-        .skip(skip)
-        .limit(limit)
-        .toArray()
+      // Add MMR difference calculation
+      pipeline.push({
+        $addFields: {
+          mmrDifference: {
+            $cond: {
+              if: { $and: [{ $ne: ["$buyNowPrice", null] }, { $ne: ["$mmrPrice", null] }] },
+              then: { $subtract: ["$buyNowPrice", "$mmrPrice"] },
+              else: 0
+            }
+          }
+        }
+      })
 
-      // Get filter options for dropdowns
+      // Add composite score calculation if needed
+      if (sortBy === 'composite_score') {
+        pipeline.push({
+          $addFields: {
+            compositeScore: {
+              $add: [
+                // Invert MMR difference so negative differences (good deals) become positive scores
+                // Divide by 1000 to normalize the scale
+                { 
+                  $cond: {
+                    if: { $ne: ["$mmrDifference", null] },
+                    then: { $divide: [{ $multiply: ["$mmrDifference", -1] }, 1000] },
+                    else: 0
+                  }
+                },
+                // Add condition grade (already on 1-5 scale)
+                { 
+                  $cond: {
+                    if: { $ne: ["$conditionGradeNumeric", null] },
+                    then: "$conditionGradeNumeric",
+                    else: 0
+                  }
+                }
+              ]
+            }
+          }
+        })
+      }
+
+      // Add sorting - always add sort criteria
+      pipeline.push({ $sort: aggregationSortCriteria })
+
+      // Execute optimized aggregation
+      const [vehicles, totalCountResult] = await Promise.all([
+        collection.aggregate([...pipeline, { $skip: skip }, { $limit: limit }]).toArray(),
+        collection.aggregate([...pipeline, { $count: "total" }]).toArray()
+      ])
+
+      const totalCount = totalCountResult[0]?.total || 0
+
+      // Get filter options only if needed (when no specific filters are applied)
       let filterOptions = {
         makes: [] as string[],
         bodyStyles: [] as string[],
@@ -261,14 +278,17 @@ export async function GET(request: NextRequest) {
       }
 
       if (!search && !make && !bodyStyle && !location) {
-        const makes = await collection.distinct('make', {})
-        filterOptions.makes = makes.filter(Boolean).sort()
-
-        const bodyStyles = await collection.distinct('bodyStyle', {})
-        filterOptions.bodyStyles = bodyStyles.filter(Boolean).sort()
-
-        const locations = await collection.distinct('locationCity', {})
-        filterOptions.locations = locations.filter(Boolean).sort()
+        const [makes, bodyStyles, locations] = await Promise.all([
+          collection.distinct('make', {}),
+          collection.distinct('bodyStyle', {}),
+          collection.distinct('locationCity', {})
+        ])
+        
+        filterOptions = {
+          makes: makes.filter(Boolean).sort(),
+          bodyStyles: bodyStyles.filter(Boolean).sort(),
+          locations: locations.filter(Boolean).sort()
+        }
       }
 
       // Transform vehicles for frontend with enhanced data
@@ -286,10 +306,16 @@ export async function GET(request: NextRequest) {
         const viewCount = vehicle.viewCount || Math.floor(Math.random() * 100)
         const bidCount = vehicle.bidCount || Math.floor(Math.random() * 10)
 
-        // Fix MMR field mapping - use mmrPrice from MongoDB
-        const mmrValue = vehicle.mmrPrice || vehicle.mmr || null
         const bidPriceValue = vehicle.bidPrice || 0
+        const buyNowPriceValue = vehicle.buyNowPrice || null
+        
+        // Calculate MMR difference (buyNowPrice - mmrPrice)
+        const mmrPrice = vehicle.mmrPrice || null
+        const mmrDifference = (buyNowPriceValue && mmrPrice) ? buyNowPriceValue - mmrPrice : (vehicle.mmrDifference || 0)
 
+        // Extract status from statuses array at index 0
+        const status = vehicle.statuses && vehicle.statuses.length > 0 ? vehicle.statuses[0] : 'Unknown'
+        
         return {
           id: vehicle._id?.toString() || vehicle.id,
           year: vehicle.year,
@@ -300,12 +326,15 @@ export async function GET(request: NextRequest) {
           odometer: vehicle.odometer,
           locationCity: vehicle.locationCity,
           bidPrice: bidPriceValue,
-          buyNowPrice: vehicle.buyNowPrice,
+          buyNowPrice: buyNowPriceValue,
           buyable: vehicle.buyable || false,
           atAuction: vehicle.atAuction || false,
+          auctionEndTime: vehicle.auctionEndTime,
+          auctionStartTime: vehicle.auctionStartTime,
           salvage: vehicle.salvage || vehicle.salvageVehicle || false,
-          mmr: mmrValue, // This is the key fix - properly map mmrPrice to mmr
           vin: vehicle.vin,
+          mmrDifference: mmrDifference, // Add calculated MMR difference
+          mmrValue: mmrPrice, // Add MMR value
           conditionGrade: parseFloat(conditionGrade),
           carfaxStatus,
           autoCheckStatus: vehicle.autoCheckStatus || carfaxStatus,
@@ -313,25 +342,33 @@ export async function GET(request: NextRequest) {
           viewCount,
           bidCount,
           listingStatus: vehicle.listingStatus || 'active',
-          lastPriceUpdate: vehicle.lastPriceUpdate || new Date().toISOString()
+          lastPriceUpdate: vehicle.lastPriceUpdate || new Date().toISOString(),
+          sellerName: vehicle.sellerName || 'Unknown Seller',
+          mComVdpUrl: `https://www.manheim.com/listings/vehicles/details?listingId=${vehicle._id?.toString() || vehicle.id}`,
+          status: status
         }
       })
 
       console.log(`Found ${transformedVehicles.length} vehicles from MongoDB (page ${page}, total: ${totalCount}, sort: ${sortBy})`)
       
-      // Debug: Log first vehicle's MMR data
+      // Debug: Log first vehicle's MMR difference data
       if (transformedVehicles.length > 0) {
         const firstVehicle = transformedVehicles[0]
-        console.log(`Sample vehicle MMR data: bidPrice=${firstVehicle.bidPrice}, mmr=${firstVehicle.mmr}, percentage=${firstVehicle.mmr ? Math.round(((firstVehicle.bidPrice - firstVehicle.mmr) / firstVehicle.mmr * 100)) : 'N/A'}%`)
+        console.log(`Sample vehicle MMR data: buyNowPrice=${firstVehicle.buyNowPrice}, mmrDifference=${firstVehicle.mmrDifference}`)
       }
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         vehicles: transformedVehicles,
         total: totalCount,
         page,
         totalPages: Math.ceil(totalCount / limit),
         filterOptions
       })
+
+      // Add caching headers for better performance
+      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
+      
+      return response
 
     } catch (dbError) {
       console.error('MongoDB connection failed, using enhanced mock data:', dbError)
@@ -347,12 +384,14 @@ export async function GET(request: NextRequest) {
           exteriorColor: 'Silver',
           odometer: 45000,
           locationCity: 'Atlanta',
-          bidPrice: 16500, // Below MMR - good deal
+          bidPrice: 16500,
           buyNowPrice: 19000,
           buyable: true,
           atAuction: true,
           salvage: false,
-          mmr: 18500,
+          mmrPrice: 18500,
+          mmrDifference: 500, // 19000 - 18500
+          mmrValue: 18500, // Add MMR value for consistency
           vin: '1HGBH41JXMN109186',
           conditionGrade: 3.8,
           carfaxStatus: 'clean',
@@ -372,12 +411,14 @@ export async function GET(request: NextRequest) {
           exteriorColor: 'Blue',
           odometer: 32000,
           locationCity: 'Dallas',
-          bidPrice: 19500, // Above MMR - overpriced
+          bidPrice: 19500,
           buyNowPrice: 22000,
           buyable: true,
           atAuction: false,
           salvage: false,
-          mmr: 16800,
+          mmrPrice: 18800,
+          mmrDifference: 3200, // 22000 - 18800
+          mmrValue: 18800, // Add MMR value for consistency
           vin: '2HGFC2F59JH542123',
           conditionGrade: 4.1,
           carfaxStatus: 'clean',
@@ -397,12 +438,14 @@ export async function GET(request: NextRequest) {
           exteriorColor: 'Red',
           odometer: 68000,
           locationCity: 'Phoenix',
-          bidPrice: 22000, // Near MMR
+          bidPrice: 22000,
           buyNowPrice: 25000,
           buyable: false,
           atAuction: true,
           salvage: true,
-          mmr: 23000,
+          mmrPrice: 23000,
+          mmrDifference: 2000, // 25000 - 23000
+          mmrValue: 23000, // Add MMR value for consistency
           vin: '1FTEW1EP5JFA12345',
           conditionGrade: 2.5,
           carfaxStatus: 'issues',
@@ -422,12 +465,14 @@ export async function GET(request: NextRequest) {
           exteriorColor: 'White',
           odometer: 25000,
           locationCity: 'Miami',
-          bidPrice: 18500, // Great deal - well below MMR
+          bidPrice: 18500,
           buyNowPrice: 21000,
           buyable: true,
           atAuction: true,
           salvage: false,
-          mmr: 22000,
+          mmrPrice: 19500,
+          mmrDifference: 1500, // 21000 - 19500
+          mmrValue: 19500, // Add MMR value for consistency
           vin: '1G1ZD5ST5MF123456',
           conditionGrade: 4.3,
           carfaxStatus: 'clean',
@@ -447,12 +492,14 @@ export async function GET(request: NextRequest) {
           exteriorColor: 'Black',
           odometer: 55000,
           locationCity: 'Los Angeles',
-          bidPrice: 27500, // Overpriced
+          bidPrice: 27500,
           buyNowPrice: 30000,
           buyable: true,
           atAuction: false,
           salvage: false,
-          mmr: 23500,
+          mmrPrice: 26500,
+          mmrDifference: 3500, // 30000 - 26500
+          mmrValue: 26500, // Add MMR value for consistency
           vin: 'WBA8E9G59HNU12345',
           conditionGrade: 3.9,
           carfaxStatus: 'clean',
@@ -472,12 +519,14 @@ export async function GET(request: NextRequest) {
           exteriorColor: 'Blue',
           odometer: 15000,
           locationCity: 'Seattle',
-          bidPrice: 36000, // Near MMR
+          bidPrice: 36000,
           buyNowPrice: 38000,
           buyable: true,
           atAuction: true,
           salvage: false,
-          mmr: 37000,
+          mmrPrice: 37000,
+          mmrDifference: 1000, // 38000 - 37000
+          mmrValue: 37000, // Add MMR value for consistency
           vin: '5YJ3E1EA4NF123456',
           conditionGrade: 4.5,
           carfaxStatus: 'clean',
@@ -491,84 +540,48 @@ export async function GET(request: NextRequest) {
       ]
 
       // Apply filters to mock data
-      let filteredVehicles = mockVehicles
-
-      // Apply all the same filters as MongoDB version
-      if (search) {
-        const searchLower = search.toLowerCase()
-        filteredVehicles = filteredVehicles.filter(v => 
-          v.make.toLowerCase().includes(searchLower) ||
-          v.models.some(m => m.toLowerCase().includes(searchLower)) ||
-          v.vin.toLowerCase().includes(searchLower) ||
-          v.bodyStyle.toLowerCase().includes(searchLower)
-        )
-      }
-
-      if (make) filteredVehicles = filteredVehicles.filter(v => v.make.toLowerCase() === make.toLowerCase())
-      if (bodyStyle) filteredVehicles = filteredVehicles.filter(v => v.bodyStyle.toLowerCase() === bodyStyle.toLowerCase())
-      if (yearMin) filteredVehicles = filteredVehicles.filter(v => v.year >= parseInt(yearMin))
-      if (yearMax) filteredVehicles = filteredVehicles.filter(v => v.year <= parseInt(yearMax))
-      if (priceMin) filteredVehicles = filteredVehicles.filter(v => v.bidPrice >= parseInt(priceMin))
-      if (priceMax) filteredVehicles = filteredVehicles.filter(v => v.bidPrice <= parseInt(priceMax))
-      if (mileageMax) filteredVehicles = filteredVehicles.filter(v => v.odometer <= parseInt(mileageMax))
-      if (location) filteredVehicles = filteredVehicles.filter(v => v.locationCity.toLowerCase() === location.toLowerCase())
-      if (salvageOnly) filteredVehicles = filteredVehicles.filter(v => v.salvage)
-      if (buyNowOnly) filteredVehicles = filteredVehicles.filter(v => v.buyable)
-      if (auctionOnly) filteredVehicles = filteredVehicles.filter(v => v.atAuction)
-
-      // MMR-based filters
-      if (mmrComparison === 'below') {
-        filteredVehicles = filteredVehicles.filter(v => v.bidPrice < v.mmr)
-      } else if (mmrComparison === 'above') {
-        filteredVehicles = filteredVehicles.filter(v => v.bidPrice > v.mmr)
-      } else if (mmrComparison === 'near') {
-        filteredVehicles = filteredVehicles.filter(v => 
-          Math.abs(v.bidPrice - v.mmr) / v.mmr <= 0.05
-        )
-      }
-
-      if (mmrPercentage) {
-        const percentage = parseFloat(mmrPercentage) / 100
-        if (percentage > 0) {
-          filteredVehicles = filteredVehicles.filter(v => v.bidPrice >= v.mmr * (1 + percentage))
-        } else if (percentage < 0) {
-          filteredVehicles = filteredVehicles.filter(v => v.bidPrice <= v.mmr * (1 + percentage))
-        }
-      }
-
-      // Condition filters
-      if (conditionGradeMin) {
-        filteredVehicles = filteredVehicles.filter(v => v.conditionGrade >= parseFloat(conditionGradeMin))
-      }
-      if (carfaxClean) filteredVehicles = filteredVehicles.filter(v => v.carfaxStatus === 'clean')
-      if (autoCheckClean) filteredVehicles = filteredVehicles.filter(v => v.autoCheckStatus === 'clean')
-
-      // Inventory management filters
-      if (newListings) filteredVehicles = filteredVehicles.filter(v => v.daysOnMarket <= 7)
-      if (needsRelisting) filteredVehicles = filteredVehicles.filter(v => v.bidCount === 0 && v.daysOnMarket >= 14)
-      if (priceReductionNeeded) filteredVehicles = filteredVehicles.filter(v => v.bidPrice >= v.mmr * 1.15)
-      if (daysOnMarketMin) filteredVehicles = filteredVehicles.filter(v => v.daysOnMarket >= parseInt(daysOnMarketMin))
-      if (daysOnMarketMax) filteredVehicles = filteredVehicles.filter(v => v.daysOnMarket <= parseInt(daysOnMarketMax))
+      let filteredVehicles = mockVehicles.filter(vehicle => {
+        if (make && !vehicle.make.toLowerCase().includes(make.toLowerCase())) return false
+        if (bodyStyle && !vehicle.bodyStyle.toLowerCase().includes(bodyStyle.toLowerCase())) return false
+        if (yearMin && vehicle.year < parseInt(yearMin)) return false
+        if (yearMax && vehicle.year > parseInt(yearMax)) return false
+        if (location && !vehicle.locationCity.toLowerCase().includes(location.toLowerCase())) return false
+        if (salvageOnly) return vehicle.salvage
+        if (priceReductionNeeded && vehicle.daysOnMarket < 20) return false
+        if (daysOnMarketMin && vehicle.daysOnMarket < parseInt(daysOnMarketMin)) return false
+        if (daysOnMarketMax && vehicle.daysOnMarket > parseInt(daysOnMarketMax)) return false
+        if (conditionGradeMin && vehicle.conditionGrade < parseFloat(conditionGradeMin)) return false
+        if (conditionGradeMax && vehicle.conditionGrade > parseFloat(conditionGradeMax)) return false
+        return true
+      })
 
       // Apply sorting
       filteredVehicles.sort((a, b) => {
         switch (sortBy) {
-          case 'mmr_value':
-            const aPercent = (a.bidPrice - a.mmr) / a.mmr
-            const bPercent = (b.bidPrice - b.mmr) / b.mmr
-            return aPercent - bPercent // Best deals first (most negative percentage)
+          case 'mmr_difference':
+            return (b.mmrDifference || 0) - (a.mmrDifference || 0) // Highest difference first
+          case 'mmr_difference_low':
+            return (a.mmrDifference || 0) - (b.mmrDifference || 0) // Lowest difference first
+          case 'condition_grade_high':
+            return (b.conditionGrade || 0) - (a.conditionGrade || 0) // Highest grade first
+          case 'condition_grade_low':
+            return (a.conditionGrade || 0) - (b.conditionGrade || 0) // Lowest grade first
           case 'price_low':
             return a.bidPrice - b.bidPrice
           case 'price_high':
             return b.bidPrice - a.bidPrice
           case 'days_on_market':
             return b.daysOnMarket - a.daysOnMarket
-          case 'condition_grade':
-            return b.conditionGrade - a.conditionGrade
           case 'newest':
             return b.daysOnMarket - a.daysOnMarket // Newest = fewer days on market
+          case 'composite_score':
+            // Calculate composite scores for both vehicles
+            // Invert MMR difference so negative differences (good deals) become positive scores
+            const scoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (a.conditionGrade || 0)
+            const scoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (b.conditionGrade || 0)
+            return scoreB - scoreA // Highest composite score first
           default:
-            return b.bidPrice - a.bidPrice
+            return (b.mmrDifference || 0) - (a.mmrDifference || 0) // Default to MMR difference high to low
         }
       })
 
@@ -582,13 +595,18 @@ export async function GET(request: NextRequest) {
         locations: [...new Set(mockVehicles.map(v => v.locationCity))].sort()
       }
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         vehicles: paginatedMockVehicles,
         total: totalMockCount,
         page,
         totalPages: Math.ceil(totalMockCount / limit),
         filterOptions: mockFilterOptions
       })
+
+      // Add caching headers for better performance
+      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
+      
+      return response
     }
 
   } catch (error) {
