@@ -215,6 +215,12 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
                       <div className="font-semibold text-blue-600">${vehicle.buyNowPrice.toLocaleString()}</div>
                     </div>
                   )}
+                  {vehicle.mmrValue && (
+                    <div>
+                      <div className="text-xs text-gray-600">MMR Price</div>
+                      <div className="font-semibold text-purple-600">${vehicle.mmrValue.toLocaleString()}</div>
+                    </div>
+                  )}
                   {vehicle.mmrDifference !== undefined && (
                     <div>
                       <div className="text-xs text-gray-600">MMR Difference</div>

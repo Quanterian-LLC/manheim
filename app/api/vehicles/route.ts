@@ -345,7 +345,8 @@ export async function GET(request: NextRequest) {
           lastPriceUpdate: vehicle.lastPriceUpdate || new Date().toISOString(),
           sellerName: vehicle.sellerName || 'Unknown Seller',
           mComVdpUrl: `https://www.manheim.com/listings/vehicles/details?listingId=${vehicle._id?.toString() || vehicle.id}`,
-          status: status
+          status: status,
+          conditionReportUrl: vehicle.conditionReportUrl || null
         }
       })
 
@@ -400,7 +401,8 @@ export async function GET(request: NextRequest) {
           viewCount: 45,
           bidCount: 3,
           listingStatus: 'active',
-          lastPriceUpdate: '2024-01-10T10:00:00Z'
+          lastPriceUpdate: '2024-01-10T10:00:00Z',
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=1&listingID=1'
         },
         {
           id: '2',
@@ -427,7 +429,8 @@ export async function GET(request: NextRequest) {
           viewCount: 12,
           bidCount: 0,
           listingStatus: 'needs_relisting',
-          lastPriceUpdate: '2024-01-05T14:30:00Z'
+          lastPriceUpdate: '2024-01-05T14:30:00Z',
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=2&listingID=2'
         },
         {
           id: '3',
@@ -454,7 +457,8 @@ export async function GET(request: NextRequest) {
           viewCount: 67,
           bidCount: 5,
           listingStatus: 'active',
-          lastPriceUpdate: '2024-01-12T09:15:00Z'
+          lastPriceUpdate: '2024-01-12T09:15:00Z',
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=3&listingID=3'
         },
         {
           id: '4',
@@ -481,7 +485,8 @@ export async function GET(request: NextRequest) {
           viewCount: 89,
           bidCount: 8,
           listingStatus: 'hot',
-          lastPriceUpdate: '2024-01-15T16:45:00Z'
+          lastPriceUpdate: '2024-01-15T16:45:00Z',
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=4&listingID=4'
         },
         {
           id: '5',
@@ -508,7 +513,8 @@ export async function GET(request: NextRequest) {
           viewCount: 23,
           bidCount: 1,
           listingStatus: 'price_reduction_needed',
-          lastPriceUpdate: '2024-01-08T11:20:00Z'
+          lastPriceUpdate: '2024-01-08T11:20:00Z',
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=5&listingID=5'
         },
         {
           id: '6',
@@ -535,7 +541,8 @@ export async function GET(request: NextRequest) {
           viewCount: 156,
           bidCount: 12,
           listingStatus: 'new_listing',
-          lastPriceUpdate: '2024-01-16T08:00:00Z'
+          lastPriceUpdate: '2024-01-16T08:00:00Z',
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=6&listingID=6'
         }
       ]
 
