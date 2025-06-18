@@ -344,7 +344,7 @@ export async function GET(request: NextRequest) {
           listingStatus: vehicle.listingStatus || 'active',
           lastPriceUpdate: vehicle.lastPriceUpdate || new Date().toISOString(),
           sellerName: vehicle.sellerName || 'Unknown Seller',
-          mComVdpUrl: `https://www.manheim.com/listings/vehicles/details?listingId=${vehicle._id?.toString() || vehicle.id}`,
+          mComVdpUrl: vehicle.mComVdpUrl || null,
           status: status,
           conditionReportUrl: vehicle.conditionReportUrl || null
         }
@@ -402,7 +402,8 @@ export async function GET(request: NextRequest) {
           bidCount: 3,
           listingStatus: 'active',
           lastPriceUpdate: '2024-01-10T10:00:00Z',
-          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=1&listingID=1'
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=1&listingID=1',
+          mComVdpUrl: 'https://search.manheim.com/results#/details/1HGBH41JXMN109186/OVE'
         },
         {
           id: '2',
@@ -430,7 +431,8 @@ export async function GET(request: NextRequest) {
           bidCount: 0,
           listingStatus: 'needs_relisting',
           lastPriceUpdate: '2024-01-05T14:30:00Z',
-          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=2&listingID=2'
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=2&listingID=2',
+          mComVdpUrl: 'https://search.manheim.com/results#/details/2HGFC2F59JH542123/OVE'
         },
         {
           id: '3',
@@ -458,7 +460,8 @@ export async function GET(request: NextRequest) {
           bidCount: 5,
           listingStatus: 'active',
           lastPriceUpdate: '2024-01-12T09:15:00Z',
-          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=3&listingID=3'
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=3&listingID=3',
+          mComVdpUrl: 'https://search.manheim.com/results#/details/1FTEW1EP5JFA12345/OVE'
         },
         {
           id: '4',
@@ -486,7 +489,8 @@ export async function GET(request: NextRequest) {
           bidCount: 8,
           listingStatus: 'hot',
           lastPriceUpdate: '2024-01-15T16:45:00Z',
-          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=4&listingID=4'
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=4&listingID=4',
+          mComVdpUrl: 'https://search.manheim.com/results#/details/1G1ZD5ST5MF123456/OVE'
         },
         {
           id: '5',
@@ -514,7 +518,8 @@ export async function GET(request: NextRequest) {
           bidCount: 1,
           listingStatus: 'price_reduction_needed',
           lastPriceUpdate: '2024-01-08T11:20:00Z',
-          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=5&listingID=5'
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=5&listingID=5',
+          mComVdpUrl: 'https://search.manheim.com/results#/details/WBA8E9G59HNU12345/OVE'
         },
         {
           id: '6',
@@ -542,7 +547,8 @@ export async function GET(request: NextRequest) {
           bidCount: 12,
           listingStatus: 'new_listing',
           lastPriceUpdate: '2024-01-16T08:00:00Z',
-          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=6&listingID=6'
+          conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=6&listingID=6',
+          mComVdpUrl: 'https://search.manheim.com/results#/details/5YJ3E1EA4NF123456/OVE'
         }
       ]
 
