@@ -15,6 +15,7 @@ interface Vehicle {
   buyable: boolean
   atAuction: boolean
   auctionEndTime: string
+  auctionStartTime?: string
   exteriorColor: string
   locationCity: string
   locationZipcode: string
@@ -23,10 +24,14 @@ interface Vehicle {
   salvage?: boolean
   statuses: string[]
   vin: string
-  mmr?: number
-  mmrPrice?: number
+  mmrDifference?: number
+  mmrValue?: number
   conditionGradeNumeric: number
   daysOnMarket?: number
+  conditionReportUrl?: string
+  sellerName?: string
+  mComVdpUrl?: string
+  status?: string
 }
 
 interface VehicleCardProps {
@@ -40,8 +45,8 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
   
   // Simplified time remaining calculation
   const timeRemaining = "2 hours"
-  const dealScore = vehicle.mmrPrice && vehicle.bidPrice 
-    ? ((vehicle.mmrPrice - vehicle.bidPrice) / vehicle.mmrPrice * 100).toFixed(0)
+  const dealScore = vehicle.mmrDifference && vehicle.bidPrice 
+    ? ((vehicle.mmrDifference / vehicle.bidPrice * 100).toFixed(0))
     : "0"
   const isGoodDeal = parseInt(dealScore) > 10
 
@@ -80,33 +85,13 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     }
   }
 
-  const handleBidOrView = async () => {
-    setIsProcessing(true)
-    try {
-      if (vehicle.atAuction) {
-        // Handle bid placement
-        const response = await fetch('/api/vehicles/place-bid', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            vehicleId: vehicle.id,
-            bidAmount: vehicle.bidPrice + 100 // Increment bid by $100
-          })
-        })
-        
-        if (response.ok) {
-          console.log('Bid placed for vehicle:', vehicle.id)
-        }
-      } else {
-        // Navigate to vehicle details
-        window.location.href = `/vehicles/${vehicle.id}`
-      }
-    } catch (error) {
-      console.error('Action failed:', error)
-    } finally {
-      setIsProcessing(false)
+  const handleConditionReport = () => {
+    if (vehicle.conditionReportUrl) {
+      window.open(vehicle.conditionReportUrl, '_blank')
+    } else {
+      // Generate a mock condition report URL for demo purposes
+      const mockUrl = `https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=${vehicle.id}&listingID=${vehicle.id}`
+      window.open(mockUrl, '_blank')
     }
   }
 
@@ -142,25 +127,10 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
             
             {/* Status Badge */}
             <div className="absolute top-1 left-1">
-              <span className={vehicle.atAuction ? 'bg-green-600 text-white px-1 py-0.5 rounded text-xs' : 'bg-blue-600 text-white px-1 py-0.5 rounded text-xs'}>
-                {vehicle.atAuction ? 'Live' : 'Buy Now'}
+              <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-xs">
+                {vehicle.status || 'Unknown'}
               </span>
             </div>
-            
-            {/* MMR Analysis Badge */}
-            {vehicle.mmr && vehicle.bidPrice && (
-              <div className="absolute top-1 right-1">
-                {(() => {
-                  const percentage = Math.round(((vehicle.bidPrice - vehicle.mmr) / vehicle.mmr) * 100);
-                  const isGoodDeal = percentage < -10;
-                  return (
-                    <span className={`${isGoodDeal ? 'bg-green-600' : 'bg-gray-600'} text-white px-1 py-0.5 rounded text-xs font-medium`}>
-                      {percentage > 0 ? '+' : ''}{percentage}%
-                    </span>
-                  );
-                })()}
-              </div>
-            )}
           </div>
 
           {/* Vehicle Info */}
@@ -174,8 +144,18 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
                   {vehicle.bodyStyle} • {vehicle.exteriorColor} • {vehicle.odometer?.toLocaleString() || 'N/A'} mi
                 </p>
                 <p className="text-gray-500 text-xs mt-1">
-                  VIN: {vehicle.vin?.slice(-8) || 'N/A'}
+                  VIN: {vehicle.vin || 'N/A'}
                 </p>
+                {vehicle.sellerName && (
+                  <p className="text-blue-600 text-xs mt-1 font-medium">
+                    Seller: {vehicle.sellerName}
+                  </p>
+                )}
+                {vehicle.status && (
+                  <p className="text-gray-700 text-xs mt-1">
+                    {vehicle.status}
+                  </p>
+                )}
                 
                 {/* Title Status */}
                 {vehicle.salvageVehicle && (
@@ -199,6 +179,27 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
                     </div>
                   )}
                 </div>
+                
+                {/* Auction Times */}
+                {(vehicle.auctionStartTime || vehicle.auctionEndTime) && (
+                  <div className="text-xs text-gray-600 space-y-1">
+                    {vehicle.auctionStartTime && vehicle.auctionEndTime ? (
+                      <div>
+                        Auction Start: {new Date(vehicle.auctionStartTime).toLocaleString()} | 
+                        Auction End: {new Date(vehicle.auctionEndTime).toLocaleString()}
+                      </div>
+                    ) : (
+                      <>
+                        {vehicle.auctionStartTime && (
+                          <div>Auction Start: {new Date(vehicle.auctionStartTime).toLocaleString()}</div>
+                        )}
+                        {vehicle.auctionEndTime && (
+                          <div>Auction End: {new Date(vehicle.auctionEndTime).toLocaleString()}</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
               
               {/* Pricing */}
@@ -214,9 +215,12 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
                       <div className="font-semibold text-blue-600">${vehicle.buyNowPrice.toLocaleString()}</div>
                     </div>
                   )}
-                  {vehicle.mmr && (
-                    <div className="text-xs text-gray-500">
-                      MMR: ${vehicle.mmr.toLocaleString()}
+                  {vehicle.mmrDifference !== undefined && (
+                    <div>
+                      <div className="text-xs text-gray-600">MMR Difference</div>
+                      <div className={`font-semibold ${vehicle.mmrDifference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {vehicle.mmrDifference > 0 ? '+' : ''}${Math.abs(vehicle.mmrDifference)?.toLocaleString() || '0'}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -227,19 +231,20 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
           {/* Action Buttons */}
           <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
             <button 
-              onClick={handleBuyNow}
-              disabled={isProcessing}
-              className="bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleConditionReport}
+              className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
             >
-              {isProcessing ? 'Processing...' : 'Update Listing'}
+              Condition Report
             </button>
-            <button 
-              onClick={handleBidOrView}
-              disabled={isProcessing}
-              className="bg-gray-200 text-gray-700 text-sm py-2 rounded hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? 'Processing...' : 'View Reports'}
-            </button>
+            
+            {vehicle.mComVdpUrl && (
+              <button 
+                onClick={() => window.open(vehicle.mComVdpUrl, '_blank')}
+                className="bg-purple-600 text-white text-sm py-2 rounded hover:bg-purple-700 transition-colors"
+              >
+                View Details
+              </button>
+            )}
             
             {/* Watchlist Button */}
             <button 
@@ -268,44 +273,10 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
         
         {/* Status Badge */}
         <div className="absolute top-2 left-2">
-          <span className={vehicle.atAuction ? 'bg-green-600 text-white px-2 py-1 rounded text-xs' : 'bg-blue-600 text-white px-2 py-1 rounded text-xs'}>
-            {vehicle.atAuction ? 'Live' : 'Buy Now'}
+          <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-xs">
+            {vehicle.status || 'Unknown'}
           </span>
         </div>
-        
-        {/* MMR Analysis Badge */}
-        {vehicle.mmr && vehicle.bidPrice && (
-          <div className="absolute top-2 right-2">
-            {(() => {
-              const percentage = Math.round(((vehicle.bidPrice - vehicle.mmr) / vehicle.mmr) * 100);
-              const isGoodDeal = percentage < -10;
-              return (
-                <span className={`${isGoodDeal ? 'bg-green-600' : 'bg-gray-600'} text-white px-2 py-1 rounded text-xs font-medium`}>
-                  {percentage > 0 ? '+' : ''}{percentage}% MMR
-                </span>
-              );
-            })()}
-          </div>
-        )}
-        
-        {/* Days on Market */}
-        {vehicle.daysOnMarket && (
-          <div className="absolute bottom-2 left-2">
-            <span className="bg-gray-800 text-white px-2 py-1 rounded text-xs">
-              {vehicle.daysOnMarket}d
-            </span>
-          </div>
-        )}
-        
-        {/* Heart Icon */}
-        <button 
-          onClick={handleWatchlist}
-          className={`absolute bottom-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors ${
-            isWatchlisted ? 'text-red-500' : 'text-gray-400'
-          }`}
-        >
-          <span className="text-lg">{isWatchlisted ? '❤️' : '♡'}</span>
-        </button>
       </div>
 
       {/* Vehicle Info */}
@@ -318,18 +289,63 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
             {vehicle.bodyStyle} • {vehicle.exteriorColor} • {vehicle.odometer?.toLocaleString() || 'N/A'} mi
           </p>
           <p className="text-gray-500 text-xs mt-1">
-            VIN: {vehicle.vin?.slice(-8) || 'N/A'}
+            VIN: {vehicle.vin || 'N/A'}
           </p>
-        </div>
-
-        {/* Title Status */}
-        {vehicle.salvageVehicle && (
-          <div className="flex items-center space-x-2">
-            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
-              Salvage
-            </span>
+          {vehicle.sellerName && (
+            <p className="text-blue-600 text-xs mt-1 font-medium">
+              Seller: {vehicle.sellerName}
+            </p>
+          )}
+          {vehicle.status && (
+            <p className="text-gray-700 text-xs mt-1">
+              {vehicle.status}
+            </p>
+          )}
+          
+          {/* Title Status */}
+          {vehicle.salvageVehicle && (
+            <div className="mt-1">
+              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
+                Salvage
+              </span>
+            </div>
+          )}
+          
+          {/* Location & Timing */}
+          <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+            <div className="flex items-center space-x-1">
+              <span>📍</span>
+              <span>{vehicle.locationCity || 'Unknown Location'}</span>
+            </div>
+            {vehicle.daysOnMarket && (
+              <div className="flex items-center space-x-1">
+                <span>📅</span>
+                <span>{vehicle.daysOnMarket}d on market</span>
+              </div>
+            )}
           </div>
-        )}
+          
+          {/* Auction Times */}
+          {(vehicle.auctionStartTime || vehicle.auctionEndTime) && (
+            <div className="text-xs text-gray-600 space-y-1">
+              {vehicle.auctionStartTime && vehicle.auctionEndTime ? (
+                <div>
+                  Auction Start: {new Date(vehicle.auctionStartTime).toLocaleString()} | 
+                  Auction End: {new Date(vehicle.auctionEndTime).toLocaleString()}
+                </div>
+              ) : (
+                <>
+                  {vehicle.auctionStartTime && (
+                    <div>Auction Start: {new Date(vehicle.auctionStartTime).toLocaleString()}</div>
+                  )}
+                  {vehicle.auctionEndTime && (
+                    <div>Auction End: {new Date(vehicle.auctionEndTime).toLocaleString()}</div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Pricing */}
         <div className="space-y-2">
@@ -337,16 +353,20 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
             <span className="text-sm text-gray-600">Current Price</span>
             <span className="font-semibold text-lg">${vehicle.bidPrice?.toLocaleString() || 'N/A'}</span>
           </div>
-          {vehicle.buyNowPrice && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Buy Now</span>
+            <span className="font-semibold text-blue-600">${vehicle.buyNowPrice?.toLocaleString() || 'N/A'}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">MMR Price</span>
+            <span className="font-semibold text-purple-600">${vehicle.mmrValue?.toLocaleString() || 'N/A'}</span>
+          </div>
+          {vehicle.mmrDifference !== undefined && (
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Buy Now</span>
-              <span className="font-semibold text-blue-600">${vehicle.buyNowPrice?.toLocaleString() || 'N/A'}</span>
-            </div>
-          )}
-          {(vehicle.mmr || vehicle.mmrPrice) && (
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">MMR Value</span>
-              <span className="text-gray-500">${(vehicle.mmr || vehicle.mmrPrice)?.toLocaleString() || 'N/A'}</span>
+              <span className="text-sm text-gray-600">MMR Difference</span>
+              <span className={`font-semibold ${vehicle.mmrDifference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {vehicle.mmrDifference > 0 ? '+' : ''}${Math.abs(vehicle.mmrDifference)?.toLocaleString() || '0'}
+              </span>
             </div>
           )}
         </div>
@@ -365,21 +385,53 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
           )}
         </div>
 
+        {/* Auction Times */}
+        {(vehicle.auctionStartTime || vehicle.auctionEndTime) && (
+          <div className="text-xs text-gray-600 space-y-1">
+            {vehicle.auctionStartTime && vehicle.auctionEndTime ? (
+              <div>
+                Auction Start: {new Date(vehicle.auctionStartTime).toLocaleString()} | 
+                Auction End: {new Date(vehicle.auctionEndTime).toLocaleString()}
+              </div>
+            ) : (
+              <>
+                {vehicle.auctionStartTime && (
+                  <div>Auction Start: {new Date(vehicle.auctionStartTime).toLocaleString()}</div>
+                )}
+                {vehicle.auctionEndTime && (
+                  <div>Auction End: {new Date(vehicle.auctionEndTime).toLocaleString()}</div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Action Buttons */}
-        <div className="flex space-x-2 pt-2">
+        <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
           <button 
-            onClick={handleBuyNow}
-            disabled={isProcessing}
-            className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleConditionReport}
+            className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
           >
-            {isProcessing ? 'Processing...' : 'Update Listing'}
+            Condition Report
           </button>
+          
+          {vehicle.mComVdpUrl && (
+            <button 
+              onClick={() => window.open(vehicle.mComVdpUrl, '_blank')}
+              className="bg-purple-600 text-white text-sm py-2 rounded hover:bg-purple-700 transition-colors"
+            >
+              View Details
+            </button>
+          )}
+          
+          {/* Watchlist Button */}
           <button 
-            onClick={handleBidOrView}
-            disabled={isProcessing}
-            className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleWatchlist}
+            className={`p-2 border rounded transition-colors text-sm ${
+              isWatchlisted ? 'text-red-500 border-red-300 bg-red-50' : 'text-gray-400 border-gray-300 hover:bg-gray-50'
+            }`}
           >
-            {isProcessing ? 'Processing...' : 'View Reports'}
+            {isWatchlisted ? '❤️ Saved' : '♡ Save'}
           </button>
         </div>
       </div>

@@ -86,45 +86,16 @@ const mockVehicles = [
 export default function VehicleGrid({ 
   searchQuery, 
   filters, 
-  vehicles = mockVehicles,
+  vehicles = [],
   loading = false,
   totalCount = 0,
   currentPage = 1,
   onPageChange
 }: VehicleGridProps) {
-  const [sortBy, setSortBy] = useState('bidPrice')
-  const [filteredVehicles, setFilteredVehicles] = useState(vehicles)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
 
-  useEffect(() => {
-    // Apply client-side filtering and sorting
-    let filtered = vehicles.filter(vehicle => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        const searchableText = `${vehicle.make} ${vehicle.models?.[0] || ''} ${vehicle.year} ${vehicle.vin}`.toLowerCase()
-        if (!searchableText.includes(query)) return false
-      }
-      return true
-    })
-
-    // Apply sorting
-    filtered = filtered.sort((a, b) => {
-      const aValue = a[sortBy as keyof typeof a] as any
-      const bValue = b[sortBy as keyof typeof b] as any
-      
-      if (sortBy === 'bidPrice' || sortBy === 'odometer') {
-        return aValue - bValue
-      }
-      return String(aValue).localeCompare(String(bValue))
-    })
-
-    setFilteredVehicles(filtered)
-  }, [vehicles, searchQuery, filters, sortBy])
-
-  const handleSortChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortBy(event.target.value)
-  }
+  // Use vehicles from API directly, since sorting/filtering is handled server-side
+  const displayVehicles = vehicles.length > 0 ? vehicles : mockVehicles
 
   if (loading) {
     return (
@@ -169,7 +140,7 @@ export default function VehicleGrid({
       {/* Results Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">
-          {totalCount > 0 ? `${totalCount.toLocaleString()} Vehicles Found` : `${filteredVehicles.length} Vehicles Found`}
+          {totalCount > 0 ? `${totalCount.toLocaleString()} Vehicles Found` : `${displayVehicles.length} Vehicles Found`}
         </h2>
         <div className="flex items-center space-x-4">
           {/* View Toggle */}
@@ -198,38 +169,26 @@ export default function VehicleGrid({
               </button>
             </div>
           </div>
-          
-          <span className="text-sm text-gray-600">Sort by:</span>
-          <select 
-            className="border border-gray-300 rounded px-3 py-1 text-sm"
-            value={sortBy}
-            onChange={handleSortChange}
-          >
-            <option value="bidPrice">Price: Low to High</option>
-            <option value="year">Year: Newest First</option>
-            <option value="odometer">Mileage: Low to High</option>
-            <option value="make">Make: A to Z</option>
-          </select>
         </div>
       </div>
 
       {/* Vehicle Display */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredVehicles.map((vehicle) => (
+          {displayVehicles.map((vehicle) => (
             <VehicleCard key={vehicle.id} vehicle={vehicle} />
           ))}
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredVehicles.map((vehicle) => (
+          {displayVehicles.map((vehicle) => (
             <VehicleCard key={vehicle.id} vehicle={vehicle} listView={true} />
           ))}
         </div>
       )}
 
       {/* No Results */}
-      {filteredVehicles.length === 0 && (
+      {displayVehicles.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500 text-lg">No vehicles found matching your criteria.</p>
           <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or search terms.</p>
