@@ -46,6 +46,10 @@ export interface Vehicle {
   hasConditionReport?: boolean
   hasFrameDamage?: boolean
   hasPriorPaint?: boolean
+  odometerCheckOK?: boolean
+  titleAndProblemCheckOK?: boolean
+  previouslyCanadianListing?: boolean
+  startBuyNowPrice?: number
   images?: string[] | null
   interiorColor?: string
   interiorColorCode?: string

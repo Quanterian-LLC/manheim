@@ -196,7 +196,7 @@ export default function VehicleGrid({
       )}
 
       {/* Pagination */}
-      {totalCount > 12 && onPageChange && (
+      {totalCount > 100 && onPageChange && (
         <div className="flex justify-center mt-8">
           <div className="flex space-x-2">
             {currentPage > 1 && (
@@ -208,7 +208,7 @@ export default function VehicleGrid({
               </button>
             )}
             
-            {[...Array(Math.min(5, Math.ceil(totalCount / 12)))].map((_, i) => {
+            {[...Array(Math.min(5, Math.ceil(totalCount / 100)))].map((_, i) => {
               const page = i + 1
               return (
                 <button
@@ -225,7 +225,7 @@ export default function VehicleGrid({
               )
             })}
             
-            {currentPage < Math.ceil(totalCount / 12) && (
+            {currentPage < Math.ceil(totalCount / 100) && (
               <button
                 onClick={() => onPageChange(currentPage + 1)}
                 className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
