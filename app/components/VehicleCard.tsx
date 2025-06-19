@@ -24,6 +24,7 @@ interface Vehicle {
   salvage?: boolean
   statuses: string[]
   vin: string
+  images?: string[]
   mmrDifference?: number
   mmrValue?: number
   conditionGradeNumeric: number
@@ -42,6 +43,60 @@ interface VehicleCardProps {
 export default function VehicleCard({ vehicle, listView = false }: VehicleCardProps) {
   const [isWatchlisted, setIsWatchlisted] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [imageLoading, setImageLoading] = useState(true)
+  
+  // Get the first available image URL
+  const getVehicleImage = () => {
+    if (vehicle.images && vehicle.images.length > 0) {
+      return vehicle.images[0]
+    }
+    
+    // Since database doesn't have images yet, use a placeholder service with vehicle info
+    // This creates a unique URL based on vehicle make/model for variety
+    const encodedText = encodeURIComponent(`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || 'Vehicle'}`)
+    const placeholderUrl = `https://via.placeholder.com/800x600/e5e7eb/6b7280?text=${encodedText}`
+    return placeholderUrl
+  }
+
+  const handleImageLoad = () => {
+    setImageLoading(false)
+  }
+
+  const handleImageError = () => {
+    setImageError(true)
+    setImageLoading(false)
+  }
+
+  // Image component with fallback
+  const VehicleImage = ({ className, alt }: { className: string; alt: string }) => {
+    const imageUrl = getVehicleImage()
+    
+    if (!imageUrl || imageError) {
+      return (
+        <div className={`${className} bg-gray-200 flex items-center justify-center`}>
+          <span className="text-gray-500 text-4xl">🚗</span>
+        </div>
+      )
+    }
+
+    return (
+      <div className={`${className} relative overflow-hidden`}>
+        {imageLoading && (
+          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+            <span className="text-gray-500">Loading...</span>
+          </div>
+        )}
+        <img
+          src={imageUrl}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+        />
+      </div>
+    )
+  }
   
   // Simplified time remaining calculation
   const timeRemaining = "2 hours"
@@ -121,9 +176,10 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
         <div className="flex items-center space-x-6">
           {/* Vehicle Image */}
           <div className="relative flex-shrink-0">
-            <div className="w-32 h-24 bg-gray-200 rounded-lg flex items-center justify-center">
-              <span className="text-gray-500 text-2xl">🚗</span>
-            </div>
+            <VehicleImage 
+              className="w-32 h-24 rounded-lg" 
+              alt={`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || 'Vehicle'}`}
+            />
             
             {/* Status Badge */}
             <div className="absolute top-1 left-1">
@@ -145,6 +201,9 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
                 </p>
                 <p className="text-gray-500 text-xs mt-1">
                   VIN: {vehicle.vin || 'N/A'}
+                </p>
+                <p className="text-green-600 text-xs mt-1 font-medium">
+                  Condition Grade: {vehicle.conditionGradeNumeric ? Number(vehicle.conditionGradeNumeric).toFixed(1) : 'N/A'}/5.0
                 </p>
                 {vehicle.sellerName && (
                   <p className="text-blue-600 text-xs mt-1 font-medium">
@@ -271,11 +330,12 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
-      {/* Vehicle Image Placeholder */}
+      {/* Vehicle Image */}
       <div className="relative mb-4">
-        <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-          <span className="text-gray-500 text-4xl">🚗</span>
-        </div>
+        <VehicleImage 
+          className="w-full h-48 rounded-lg" 
+          alt={`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || 'Vehicle'}`}
+        />
         
         {/* Status Badge */}
         <div className="absolute top-2 left-2">
@@ -296,6 +356,9 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
           </p>
           <p className="text-gray-500 text-xs mt-1">
             VIN: {vehicle.vin || 'N/A'}
+          </p>
+          <p className="text-green-600 text-xs mt-1 font-medium">
+            Condition Grade: {vehicle.conditionGradeNumeric ? Number(vehicle.conditionGradeNumeric).toFixed(1) : 'N/A'}/5.0
           </p>
           {vehicle.sellerName && (
             <p className="text-blue-600 text-xs mt-1 font-medium">

@@ -60,6 +60,8 @@ interface Filters {
   daysOnMarketMin: string
   daysOnMarketMax: string
   conditionGradeMax: string
+  // User's specific criteria filter
+  specificCriteriaOnly: boolean
 }
 
 export default function Home() {
@@ -91,7 +93,8 @@ export default function Home() {
     priceReductionNeeded: false,
     daysOnMarketMin: '',
     daysOnMarketMax: '',
-    conditionGradeMax: ''
+    conditionGradeMax: '',
+    specificCriteriaOnly: true
   })
 
   const [availableFilters, setAvailableFilters] = useState({
@@ -107,7 +110,7 @@ export default function Home() {
       // Build only necessary parameters (exclude empty values)
       const params: Record<string, string> = {
         page: page.toString(),
-        limit: '12',
+        limit: '100',
         sortBy: sortBy
       }
 
@@ -184,7 +187,8 @@ export default function Home() {
       priceReductionNeeded: false,
       daysOnMarketMin: '',
       daysOnMarketMax: '',
-      conditionGradeMax: ''
+      conditionGradeMax: '',
+      specificCriteriaOnly: true
     })
   }
 
@@ -302,7 +306,7 @@ export default function Home() {
                   >
                     <option value="mmr_difference">MMR Difference: High to Low (Best Deals)</option>
                     <option value="mmr_difference_low">MMR Difference: Low to High</option>
-                    <option value="composite_score">🎯 Best Deals (Low Price + High Condition)</option>
+                    <option value="composite_score">🎯 Best Deals (Low Price + Low Condition)</option>
                     <option value="condition_grade_high">Condition Grade: High to Low</option>
                     <option value="condition_grade_low">Condition Grade: Low to High</option>
                     <option value="price_low">Price: Low to High</option>
@@ -542,9 +546,24 @@ export default function Home() {
                 )}
                 {currentPage > 1 && (
                   <p className="text-sm text-gray-600">
-                    Page {currentPage} of {Math.ceil(totalCount / 12)}
+                    Page {currentPage} of {Math.ceil(totalCount / 100)}
                   </p>
                 )}
+              </div>
+              
+              {/* Specific Criteria Filter Toggle */}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.specificCriteriaOnly}
+                    onChange={(e) => handleFilterChange('specificCriteriaOnly', e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Show Clean Vehicles Only
+                  </span>
+                </label>
               </div>
             </div>
 

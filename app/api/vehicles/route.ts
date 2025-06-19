@@ -107,8 +107,20 @@ export async function GET(request: NextRequest) {
     const daysOnMarketMin = searchParams.get('daysOnMarketMin') || ''
     const daysOnMarketMax = searchParams.get('daysOnMarketMax') || ''
 
+    // User's specific criteria filters
+    const specificCriteriaOnly = searchParams.get('specificCriteriaOnly') === 'true'
+
     // Build MongoDB query
     const query: any = {}
+
+    // Apply user's specific criteria if requested
+    if (specificCriteriaOnly) {
+      // Show ONLY clean, investment-worthy vehicles
+      query.hasFrameDamage = false // NO frame damage
+      query.asIs = false // NOT sold as-is
+      query.salvageVehicle = false // NOT salvage
+      query.buyNowPrice = { $ne: null, $exists: true, $gt: 1 } // Has valid buy-now price
+    }
 
     // Search across multiple fields
     if (search) {
@@ -245,11 +257,12 @@ export async function GET(request: NextRequest) {
                     else: 0
                   }
                 },
-                // Add condition grade (already on 1-5 scale)
+                // Invert condition grade so lower grades (worse condition, lower price) get higher scores
+                // Subtract from 6 to invert the scale (5.0 becomes 1.0, 1.0 becomes 5.0)
                 { 
                   $cond: {
                     if: { $ne: ["$conditionGradeNumeric", null] },
-                    then: "$conditionGradeNumeric",
+                    then: { $subtract: [6, "$conditionGradeNumeric"] },
                     else: 0
                   }
                 }
@@ -333,9 +346,11 @@ export async function GET(request: NextRequest) {
           auctionStartTime: vehicle.auctionStartTime,
           salvage: vehicle.salvage || vehicle.salvageVehicle || false,
           vin: vehicle.vin,
+          images: vehicle.images || [], // Add images from database
           mmrDifference: mmrDifference, // Add calculated MMR difference
           mmrValue: mmrPrice, // Add MMR value
           conditionGrade: parseFloat(conditionGrade),
+          conditionGradeNumeric: vehicle.conditionGradeNumeric || parseFloat(conditionGrade),
           carfaxStatus,
           autoCheckStatus: vehicle.autoCheckStatus || carfaxStatus,
           daysOnMarket,
@@ -390,6 +405,12 @@ export async function GET(request: NextRequest) {
           buyable: true,
           atAuction: true,
           salvage: false,
+          salvageVehicle: false,
+          hasFrameDamage: false,
+          asIs: false,
+          odometerCheckOK: true,
+          titleAndProblemCheckOK: true,
+          previouslyCanadianListing: false,
           mmrPrice: 18500,
           mmrDifference: 500, // 19000 - 18500
           mmrValue: 18500, // Add MMR value for consistency
@@ -448,6 +469,12 @@ export async function GET(request: NextRequest) {
           buyable: false,
           atAuction: true,
           salvage: true,
+          salvageVehicle: true, // This vehicle would be EXCLUDED from qualified criteria
+          hasFrameDamage: true, // This vehicle would be EXCLUDED 
+          asIs: true, // This vehicle would be EXCLUDED
+          odometerCheckOK: false, // This vehicle would be EXCLUDED
+          titleAndProblemCheckOK: false, // This vehicle would be EXCLUDED
+          previouslyCanadianListing: true, // This vehicle would be EXCLUDED
           mmrPrice: 23000,
           mmrDifference: 2000, // 25000 - 23000
           mmrValue: 23000, // Add MMR value for consistency
@@ -590,13 +617,15 @@ export async function GET(request: NextRequest) {
           case 'composite_score':
             // Calculate composite scores for both vehicles
             // Invert MMR difference so negative differences (good deals) become positive scores
-            const scoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (a.conditionGrade || 0)
-            const scoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (b.conditionGrade || 0)
+            // Invert condition grade so lower grades (worse condition, lower price) get higher scores
+            const scoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (6 - (a.conditionGrade || 0))
+            const scoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (6 - (b.conditionGrade || 0))
             return scoreB - scoreA // Highest composite score first
           default:
             // Default to composite score (best deals)
-            const defaultScoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (a.conditionGrade || 0)
-            const defaultScoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (b.conditionGrade || 0)
+            // Invert condition grade so lower grades (worse condition, lower price) get higher scores
+            const defaultScoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (6 - (a.conditionGrade || 0))
+            const defaultScoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (6 - (b.conditionGrade || 0))
             return defaultScoreB - defaultScoreA // Highest composite score first
         }
       })
