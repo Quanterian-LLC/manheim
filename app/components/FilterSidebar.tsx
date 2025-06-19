@@ -1,5 +1,5 @@
 'use client'
-
+//this is the filter sidebar component
 import React, { useState } from 'react'
 
 interface FilterSidebarProps {
