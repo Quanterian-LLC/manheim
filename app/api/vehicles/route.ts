@@ -107,20 +107,12 @@ export async function GET(request: NextRequest) {
     const daysOnMarketMin = searchParams.get('daysOnMarketMin') || ''
     const daysOnMarketMax = searchParams.get('daysOnMarketMax') || ''
 
-    // User's specific criteria filters
-    const specificCriteriaOnly = searchParams.get('specificCriteriaOnly') === 'true'
+    // Removed specificCriteriaOnly filter
 
     // Build MongoDB query
     const query: any = {}
 
-    // Apply user's specific criteria if requested
-    if (specificCriteriaOnly) {
-      // Show ONLY clean, investment-worthy vehicles
-      query.hasFrameDamage = false // NO frame damage
-      query.asIs = false // NOT sold as-is
-      query.salvageVehicle = false // NOT salvage
-      query.buyNowPrice = { $ne: null, $exists: true, $gt: 1 } // Has valid buy-now price
-    }
+    // Removed specificCriteriaOnly filter logic
 
     // Search across multiple fields
     if (search) {
@@ -141,11 +133,63 @@ export async function GET(request: NextRequest) {
       if (yearMax) query.year.$lte = parseInt(yearMax)
     }
     if (priceMin || priceMax) {
-      query.bidPrice = {}
-      if (priceMin) query.bidPrice.$gte = parseInt(priceMin)
-      if (priceMax) query.bidPrice.$lte = parseInt(priceMax)
+      const priceConditions = []
+      if (priceMin) priceConditions.push({ 
+        $gte: [
+          { 
+            $convert: { 
+              input: "$bidPrice", 
+              to: "double", 
+              onError: 0, 
+              onNull: 0 
+            } 
+          }, 
+          parseInt(priceMin)
+        ] 
+      })
+      if (priceMax) priceConditions.push({ 
+        $lte: [
+          { 
+            $convert: { 
+              input: "$bidPrice", 
+              to: "double", 
+              onError: 0, 
+              onNull: 0 
+            } 
+          }, 
+          parseInt(priceMax)
+        ] 
+      })
+      
+      if (query.$expr) {
+        // If $expr already exists, combine with $and
+        query.$expr = { $and: [query.$expr, ...priceConditions] }
+      } else {
+        query.$expr = priceConditions.length === 1 ? priceConditions[0] : { $and: priceConditions }
+      }
     }
-    if (mileageMax) query.odometer = { $lte: parseInt(mileageMax) }
+    if (mileageMax) {
+      const mileageCondition = { 
+        $lte: [
+          { 
+            $convert: { 
+              input: "$odometer", 
+              to: "double", 
+              onError: 0, 
+              onNull: 0 
+            } 
+          }, 
+          parseInt(mileageMax)
+        ] 
+      }
+      
+      if (query.$expr) {
+        // If $expr already exists, combine with $and
+        query.$expr = { $and: [query.$expr, mileageCondition] }
+      } else {
+        query.$expr = mileageCondition
+      }
+    }
     if (location) query.locationCity = { $regex: `^${location}$`, $options: 'i' }
     if (salvageOnly) query.salvage = true
     if (buyNowOnly) query.buyable = true
@@ -153,10 +197,46 @@ export async function GET(request: NextRequest) {
 
     // Condition filters
     if (conditionGradeMin) {
-      query.conditionGradeNumeric = { $gte: parseFloat(conditionGradeMin) }
+      const conditionMinCondition = { 
+        $gte: [
+          { 
+            $convert: { 
+              input: "$conditionGradeNumeric", 
+              to: "double", 
+              onError: 0, 
+              onNull: 0 
+            } 
+          }, 
+          parseFloat(conditionGradeMin)
+        ] 
+      }
+      
+      if (query.$expr) {
+        query.$expr = { $and: [query.$expr, conditionMinCondition] }
+      } else {
+        query.$expr = conditionMinCondition
+      }
     }
     if (conditionGradeMax) {
-      query.conditionGradeNumeric = { ...query.conditionGradeNumeric, $lte: parseFloat(conditionGradeMax) }
+      const conditionMaxCondition = { 
+        $lte: [
+          { 
+            $convert: { 
+              input: "$conditionGradeNumeric", 
+              to: "double", 
+              onError: 0, 
+              onNull: 0 
+            } 
+          }, 
+          parseFloat(conditionGradeMax)
+        ] 
+      }
+      
+      if (query.$expr) {
+        query.$expr = { $and: [query.$expr, conditionMaxCondition] }
+      } else {
+        query.$expr = conditionMaxCondition
+      }
     }
     if (carfaxClean) {
       query.carfaxStatus = 'clean'
@@ -224,64 +304,53 @@ export async function GET(request: NextRequest) {
     try {
       // Connect to MongoDB
       const { db } = await connectToDatabase()
-      const collection = db.collection('manheim_car_data')
+      const collection = db.collection('updated_car_data')
 
-      // Build aggregation pipeline
-      let pipeline: any[] = [{ $match: query }]
-
-      // Add MMR difference calculation
-      pipeline.push({
-        $addFields: {
-          mmrDifference: {
-            $cond: {
-              if: { $and: [{ $ne: ["$buyNowPrice", null] }, { $ne: ["$mmrPrice", null] }] },
-              then: { $subtract: ["$buyNowPrice", "$mmrPrice"] },
-              else: 0
+      // Use simple find instead of aggregation to avoid conversion errors
+      let allVehicles = await collection.find(query).toArray()
+      
+      // Apply JavaScript-based sorting since we removed MongoDB aggregation
+      allVehicles.sort((a, b) => {
+        switch (sortBy) {
+          case 'mmr_difference': {
+            const aDiff = (parseFloat(a.mmrPrice) || 0) - (parseFloat(a.buyNowPrice) || 0)
+            const bDiff = (parseFloat(b.mmrPrice) || 0) - (parseFloat(b.buyNowPrice) || 0)
+            return bDiff - aDiff // High to low
+          }
+          case 'mmr_difference_low': {
+            const aDiff = (parseFloat(a.mmrPrice) || 0) - (parseFloat(a.buyNowPrice) || 0)
+            const bDiff = (parseFloat(b.mmrPrice) || 0) - (parseFloat(b.buyNowPrice) || 0)
+            return aDiff - bDiff // Low to high
+          }
+          case 'condition_grade_high': {
+            const aGrade = parseFloat(a.conditionGradeNumeric) || 0
+            const bGrade = parseFloat(b.conditionGradeNumeric) || 0
+            return bGrade - aGrade // High to low
+          }
+          case 'condition_grade_low': {
+            const aGrade = parseFloat(a.conditionGradeNumeric) || 0
+            const bGrade = parseFloat(b.conditionGradeNumeric) || 0
+            return aGrade - bGrade // Low to high
+          }
+          case 'composite_score':
+          default: {
+            // Calculate composite score for each vehicle
+            const calculateCompositeScore = (vehicle: any) => {
+              const mmrDiff = (parseFloat(vehicle.mmrPrice) || 0) - (parseFloat(vehicle.buyNowPrice) || 0)
+              const conditionGrade = parseFloat(vehicle.conditionGradeNumeric) || 0
+              return (mmrDiff / 1000) + (6 - conditionGrade)
             }
+            const aScore = calculateCompositeScore(a)
+            const bScore = calculateCompositeScore(b)
+            return bScore - aScore // High to low
           }
         }
       })
+      
+      const totalCount = allVehicles.length
+      const vehicles = allVehicles.slice(skip, skip + limit)
 
-      // Add composite score calculation if needed
-      if (sortBy === 'composite_score') {
-        pipeline.push({
-          $addFields: {
-            compositeScore: {
-              $add: [
-                // Invert MMR difference so negative differences (good deals) become positive scores
-                // Divide by 1000 to normalize the scale
-                { 
-                  $cond: {
-                    if: { $ne: ["$mmrDifference", null] },
-                    then: { $divide: [{ $multiply: ["$mmrDifference", -1] }, 1000] },
-                    else: 0
-                  }
-                },
-                // Invert condition grade so lower grades (worse condition, lower price) get higher scores
-                // Subtract from 6 to invert the scale (5.0 becomes 1.0, 1.0 becomes 5.0)
-                { 
-                  $cond: {
-                    if: { $ne: ["$conditionGradeNumeric", null] },
-                    then: { $subtract: [6, "$conditionGradeNumeric"] },
-                    else: 0
-                  }
-                }
-              ]
-            }
-          }
-        })
-      }
-
-      // Add sorting - always add sort criteria
-      pipeline.push({ $sort: aggregationSortCriteria })
-
-      // Execute optimized aggregation
-      const [vehicles, totalCountResult] = await Promise.all([
-        collection.aggregate([...pipeline, { $skip: skip }, { $limit: limit }]).toArray(),
-        collection.aggregate([...pipeline, { $count: "total" }]).toArray()
-      ])
-
-      const totalCount = totalCountResult[0]?.total || 0
+      // totalCount is now directly available from the Promise.all result above
 
       // Get filter options only if needed (when no specific filters are applied)
       let filterOptions = {
@@ -322,9 +391,9 @@ export async function GET(request: NextRequest) {
         const bidPriceValue = vehicle.bidPrice || 0
         const buyNowPriceValue = vehicle.buyNowPrice || null
         
-        // Calculate MMR difference (buyNowPrice - mmrPrice)
+        // Calculate MMR difference (mmrPrice - buyNowPrice, positive = good deal)
         const mmrPrice = vehicle.mmrPrice || null
-        const mmrDifference = (buyNowPriceValue && mmrPrice) ? buyNowPriceValue - mmrPrice : (vehicle.mmrDifference || 0)
+        const mmrDifference = (buyNowPriceValue && mmrPrice) ? mmrPrice - buyNowPriceValue : (vehicle.mmrDifference || 0)
 
         // Extract status from statuses array at index 0
         const status = vehicle.statuses && vehicle.statuses.length > 0 ? vehicle.statuses[0] : 'Unknown'
@@ -346,7 +415,6 @@ export async function GET(request: NextRequest) {
           auctionStartTime: vehicle.auctionStartTime,
           salvage: vehicle.salvage || vehicle.salvageVehicle || false,
           vin: vehicle.vin,
-          images: vehicle.images || [], // Add images from database
           mmrDifference: mmrDifference, // Add calculated MMR difference
           mmrValue: mmrPrice, // Add MMR value
           conditionGrade: parseFloat(conditionGrade),
@@ -361,7 +429,8 @@ export async function GET(request: NextRequest) {
           sellerName: vehicle.sellerName || 'Unknown Seller',
           mComVdpUrl: vehicle.mComVdpUrl || null,
           status: status,
-          conditionReportUrl: vehicle.conditionReportUrl || null
+          conditionReportUrl: vehicle.conditionReportUrl || null,
+          vinUrl: vehicle.vinUrl || null
         }
       })
 
@@ -412,7 +481,7 @@ export async function GET(request: NextRequest) {
           titleAndProblemCheckOK: true,
           previouslyCanadianListing: false,
           mmrPrice: 18500,
-          mmrDifference: 500, // 19000 - 18500
+          mmrDifference: -500, // 18500 - 19000 (negative means MMR < buyNow, bad deal)
           mmrValue: 18500, // Add MMR value for consistency
           vin: '1HGBH41JXMN109186',
           conditionGrade: 3.8,
@@ -424,7 +493,8 @@ export async function GET(request: NextRequest) {
           listingStatus: 'active',
           lastPriceUpdate: '2024-01-10T10:00:00Z',
           conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=1&listingID=1',
-          mComVdpUrl: 'https://search.manheim.com/results#/details/1HGBH41JXMN109186/OVE'
+          mComVdpUrl: 'https://search.manheim.com/results#/details/1HGBH41JXMN109186/OVE',
+          vinUrl: 'https://www.carfax.com/VehicleHistory/p/Report.cfx?partner=DLR_3&vin=1HGBH41JXMN109186'
         },
         {
           id: '2',
@@ -440,9 +510,15 @@ export async function GET(request: NextRequest) {
           buyable: true,
           atAuction: false,
           salvage: false,
-          mmrPrice: 18800,
-          mmrDifference: 3200, // 22000 - 18800
-          mmrValue: 18800, // Add MMR value for consistency
+          salvageVehicle: false,
+          hasFrameDamage: false,
+          asIs: false,
+          odometerCheckOK: true,
+          titleAndProblemCheckOK: true,
+          previouslyCanadianListing: false,
+          mmrPrice: 26000,
+          mmrDifference: 4000, // 26000 - 22000 (positive means MMR > buyNow, GOOD deal!)
+          mmrValue: 26000, // Add MMR value for consistency
           vin: '2HGFC2F59JH542123',
           conditionGrade: 4.1,
           carfaxStatus: 'clean',
@@ -453,7 +529,8 @@ export async function GET(request: NextRequest) {
           listingStatus: 'needs_relisting',
           lastPriceUpdate: '2024-01-05T14:30:00Z',
           conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=2&listingID=2',
-          mComVdpUrl: 'https://search.manheim.com/results#/details/2HGFC2F59JH542123/OVE'
+          mComVdpUrl: 'https://search.manheim.com/results#/details/2HGFC2F59JH542123/OVE',
+          vinUrl: 'https://www.carfax.com/VehicleHistory/p/Report.cfx?partner=DLR_3&vin=2HGFC2F59JH542123'
         },
         {
           id: '3',
@@ -476,7 +553,7 @@ export async function GET(request: NextRequest) {
           titleAndProblemCheckOK: false, // This vehicle would be EXCLUDED
           previouslyCanadianListing: true, // This vehicle would be EXCLUDED
           mmrPrice: 23000,
-          mmrDifference: 2000, // 25000 - 23000
+          mmrDifference: -2000, // 23000 - 25000 (negative means MMR < buyNow, bad deal)
           mmrValue: 23000, // Add MMR value for consistency
           vin: '1FTEW1EP5JFA12345',
           conditionGrade: 2.5,
@@ -504,8 +581,14 @@ export async function GET(request: NextRequest) {
           buyable: true,
           atAuction: true,
           salvage: false,
+          salvageVehicle: false,
+          hasFrameDamage: false,
+          asIs: false,
+          odometerCheckOK: true,
+          titleAndProblemCheckOK: true,
+          previouslyCanadianListing: false,
           mmrPrice: 19500,
-          mmrDifference: 1500, // 21000 - 19500
+          mmrDifference: 1500, // 21000 - 19500 (positive means MMR > buyNow, good deal)
           mmrValue: 19500, // Add MMR value for consistency
           vin: '1G1ZD5ST5MF123456',
           conditionGrade: 4.3,
@@ -533,8 +616,14 @@ export async function GET(request: NextRequest) {
           buyable: true,
           atAuction: false,
           salvage: false,
+          salvageVehicle: false,
+          hasFrameDamage: false,
+          asIs: false,
+          odometerCheckOK: true,
+          titleAndProblemCheckOK: true,
+          previouslyCanadianListing: false,
           mmrPrice: 26500,
-          mmrDifference: 3500, // 30000 - 26500
+          mmrDifference: 3500, // 30000 - 26500 (positive means MMR > buyNow, good deal)
           mmrValue: 26500, // Add MMR value for consistency
           vin: 'WBA8E9G59HNU12345',
           conditionGrade: 3.9,
@@ -562,8 +651,14 @@ export async function GET(request: NextRequest) {
           buyable: true,
           atAuction: true,
           salvage: false,
+          salvageVehicle: false,
+          hasFrameDamage: false,
+          asIs: false,
+          odometerCheckOK: true,
+          titleAndProblemCheckOK: true,
+          previouslyCanadianListing: false,
           mmrPrice: 37000,
-          mmrDifference: 1000, // 38000 - 37000
+          mmrDifference: 1000, // 38000 - 37000 (positive means MMR > buyNow, good deal)
           mmrValue: 37000, // Add MMR value for consistency
           vin: '5YJ3E1EA4NF123456',
           conditionGrade: 4.5,
@@ -599,9 +694,9 @@ export async function GET(request: NextRequest) {
       filteredVehicles.sort((a, b) => {
         switch (sortBy) {
           case 'mmr_difference':
-            return (b.mmrDifference || 0) - (a.mmrDifference || 0) // Highest difference first
+            return (a.mmrDifference || 0) - (b.mmrDifference || 0) // Most negative (best deals) first
           case 'mmr_difference_low':
-            return (a.mmrDifference || 0) - (b.mmrDifference || 0) // Lowest difference first
+            return (b.mmrDifference || 0) - (a.mmrDifference || 0) // Least negative (worst deals) first
           case 'condition_grade_high':
             return (b.conditionGrade || 0) - (a.conditionGrade || 0) // Highest grade first
           case 'condition_grade_low':
@@ -616,14 +711,14 @@ export async function GET(request: NextRequest) {
             return b.daysOnMarket - a.daysOnMarket // Newest = fewer days on market
           case 'composite_score':
             // Calculate composite scores for both vehicles
-            // Invert MMR difference so negative differences (good deals) become positive scores
-            // Invert condition grade so lower grades (worse condition, lower price) get higher scores
+            // More negative MMR difference = better deal (buyNowPrice - mmrPrice < 0 is good)
+            // Lower condition grade = better deal (worse condition = lower price = better value)
             const scoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (6 - (a.conditionGrade || 0))
             const scoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (6 - (b.conditionGrade || 0))
             return scoreB - scoreA // Highest composite score first
           default:
             // Default to composite score (best deals)
-            // Invert condition grade so lower grades (worse condition, lower price) get higher scores
+            // More negative MMR difference = better deal, lower condition grade = better deal
             const defaultScoreA = (a.mmrDifference !== null ? (-a.mmrDifference / 1000) : 0) + (6 - (a.conditionGrade || 0))
             const defaultScoreB = (b.mmrDifference !== null ? (-b.mmrDifference / 1000) : 0) + (6 - (b.conditionGrade || 0))
             return defaultScoreB - defaultScoreA // Highest composite score first

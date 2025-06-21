@@ -3,7 +3,7 @@ import { MongoClient, Db, Collection } from 'mongodb'
 // Get MongoDB connection string from environment variables
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017'
 const DATABASE_NAME = 'manheim'
-const COLLECTION_NAME = 'manheim_car_data'
+const COLLECTION_NAME = 'updated_car_data'
 
 // Optimized connection options for better performance
 const options = {

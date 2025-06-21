@@ -24,7 +24,6 @@ interface Vehicle {
   salvage?: boolean
   statuses: string[]
   vin: string
-  images?: string[]
   mmrDifference?: number
   mmrValue?: number
   conditionGradeNumeric: number
@@ -33,6 +32,7 @@ interface Vehicle {
   sellerName?: string
   mComVdpUrl?: string
   status?: string
+  vinUrl?: string
 }
 
 interface VehicleCardProps {
@@ -43,60 +43,7 @@ interface VehicleCardProps {
 export default function VehicleCard({ vehicle, listView = false }: VehicleCardProps) {
   const [isWatchlisted, setIsWatchlisted] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [imageError, setImageError] = useState(false)
-  const [imageLoading, setImageLoading] = useState(true)
-  
-  // Get the first available image URL
-  const getVehicleImage = () => {
-    if (vehicle.images && vehicle.images.length > 0) {
-      return vehicle.images[0]
-    }
-    
-    // Since database doesn't have images yet, use a placeholder service with vehicle info
-    // This creates a unique URL based on vehicle make/model for variety
-    const encodedText = encodeURIComponent(`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || 'Vehicle'}`)
-    const placeholderUrl = `https://via.placeholder.com/800x600/e5e7eb/6b7280?text=${encodedText}`
-    return placeholderUrl
-  }
-
-  const handleImageLoad = () => {
-    setImageLoading(false)
-  }
-
-  const handleImageError = () => {
-    setImageError(true)
-    setImageLoading(false)
-  }
-
-  // Image component with fallback
-  const VehicleImage = ({ className, alt }: { className: string; alt: string }) => {
-    const imageUrl = getVehicleImage()
-    
-    if (!imageUrl || imageError) {
-      return (
-        <div className={`${className} bg-gray-200 flex items-center justify-center`}>
-          <span className="text-gray-500 text-4xl">🚗</span>
-        </div>
-      )
-    }
-
-    return (
-      <div className={`${className} relative overflow-hidden`}>
-        {imageLoading && (
-          <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-500">Loading...</span>
-          </div>
-        )}
-        <img
-          src={imageUrl}
-          alt={alt}
-          className="w-full h-full object-cover"
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-        />
-      </div>
-    )
-  }
+  // Removed image functionality
   
   // Simplified time remaining calculation
   const timeRemaining = "2 hours"
@@ -150,6 +97,16 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     }
   }
 
+  const handleVinReport = () => {
+    if (vehicle.vinUrl) {
+      window.open(vehicle.vinUrl, '_blank')
+    } else {
+      // Generate a mock VIN report URL for demo purposes
+      const mockUrl = `https://www.carfax.com/VehicleHistory/p/Report.cfx?partner=DLR_3&vin=${vehicle.vin}`
+      window.open(mockUrl, '_blank')
+    }
+  }
+
   const handleWatchlist = async () => {
     try {
       const response = await fetch('/api/vehicles/watchlist', {
@@ -174,12 +131,11 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     return (
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
         <div className="flex items-center space-x-6">
-          {/* Vehicle Image */}
+          {/* Vehicle Icon */}
           <div className="relative flex-shrink-0">
-            <VehicleImage 
-              className="w-32 h-24 rounded-lg" 
-              alt={`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || 'Vehicle'}`}
-            />
+            <div className="w-32 h-24 rounded-lg bg-gray-100 flex items-center justify-center">
+              <span className="text-gray-400 text-3xl">🚗</span>
+            </div>
             
             {/* Status Badge */}
             <div className="absolute top-1 left-1">
@@ -302,6 +258,13 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
               Condition Report
             </button>
             
+            <button 
+              onClick={handleVinReport}
+              className="bg-orange-600 text-white text-sm py-2 rounded hover:bg-orange-700 transition-colors"
+            >
+              VIN Report
+            </button>
+            
             {vehicle.mComVdpUrl && (
               <button 
                 onClick={() => window.open(vehicle.mComVdpUrl, '_blank')}
@@ -330,12 +293,11 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
-      {/* Vehicle Image */}
+      {/* Vehicle Icon */}
       <div className="relative mb-4">
-        <VehicleImage 
-          className="w-full h-48 rounded-lg" 
-          alt={`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || 'Vehicle'}`}
-        />
+        <div className="w-full h-48 rounded-lg bg-gray-100 flex items-center justify-center">
+          <span className="text-gray-400 text-6xl">🚗</span>
+        </div>
         
         {/* Status Badge */}
         <div className="absolute top-2 left-2">
@@ -482,6 +444,13 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
             className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
           >
             Condition Report
+          </button>
+          
+          <button 
+            onClick={handleVinReport}
+            className="bg-orange-600 text-white text-sm py-2 rounded hover:bg-orange-700 transition-colors"
+          >
+            VIN Report
           </button>
           
           {vehicle.mComVdpUrl && (
