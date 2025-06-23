@@ -426,28 +426,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Checkboxes */}
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={filters.carfaxClean}
-                      onChange={(e) => handleFilterChange('carfaxClean', e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Clean Carfax Only</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={filters.autoCheckClean}
-                      onChange={(e) => handleFilterChange('autoCheckClean', e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Clean AutoCheck Only</span>
-                  </label>
-                </div>
+
               </div>
             </div>
           </div>
