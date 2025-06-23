@@ -201,7 +201,23 @@ export async function GET(request: NextRequest) {
       }
     }
     if (location) query.locationCity = { $regex: `^${location}$`, $options: 'i' }
-    if (salvageOnly) query.salvage = true
+    
+    // Salvage filtering - exclude salvage vehicles by default unless specifically requested
+    if (salvageOnly) {
+      query.salvage = true
+    } else {
+      // By default, exclude salvage vehicles
+      query.$and = query.$and || []
+      query.$and.push({
+        $or: [
+          { salvage: { $ne: true } },
+          { salvage: { $exists: false } },
+          { salvageVehicle: { $ne: true } },
+          { salvageVehicle: { $exists: false } }
+        ]
+      })
+    }
+    
     if (buyNowOnly) query.buyable = true
     if (auctionOnly) query.atAuction = true
 
