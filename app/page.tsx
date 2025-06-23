@@ -55,6 +55,16 @@ interface Filters {
   carfaxClean: boolean
   autoCheckClean: boolean
   conditionGradeMax: string
+  // New intelligent filters
+  sellerTypes: string[]
+  mmrDifferenceMin: string
+  auctionEndingSoon: boolean // Next 24 hours
+  lowMileageOnly: boolean // Under 30k miles
+  highValueOnly: boolean // MMR > $15k
+  recentListings: boolean // Last 7 days
+  pickupRegion: string
+  exteriorColor: string
+  daysOnMarketMax: string
 }
 
 export default function Home() {
@@ -64,6 +74,9 @@ export default function Home() {
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [sortBy, setSortBy] = useState('composite_score') // Default sort by composite score (best deals)
+  const [refreshing, setRefreshing] = useState(false)
+  const [availableSellerTypes, setAvailableSellerTypes] = useState<string[]>([])
+  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null)
   
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -81,14 +94,97 @@ export default function Home() {
     conditionGradeMin: '',
     carfaxClean: false,
     autoCheckClean: false,
-    conditionGradeMax: ''
+    conditionGradeMax: '',
+    // New filters
+    sellerTypes: [],
+    mmrDifferenceMin: '',
+    auctionEndingSoon: false,
+    lowMileageOnly: false,
+    highValueOnly: false,
+    recentListings: false,
+    pickupRegion: '',
+    exteriorColor: '',
+    daysOnMarketMax: ''
   })
 
   const [availableFilters, setAvailableFilters] = useState({
     makes: [] as string[],
     bodyStyles: [] as string[],
-    locations: [] as string[]
+    locations: [] as string[],
+    pickupRegions: [] as string[],
+    exteriorColors: [] as string[]
   })
+
+  // Auto-refresh data when app loads
+  const refreshData = async (selectedSellerTypes?: string[]) => {
+    setRefreshing(true)
+    try {
+      console.log('🔄 Refreshing data from Manheim API...')
+      
+      const response = await fetch('/api/vehicles/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sellerTypes: selectedSellerTypes || [
+            "Auction", "Bank", "Captive Finance", "Car Rental",
+            "Credit Union", "Independent", "Franchise", "Fleet/Lease", "Finance", "Lease"
+          ]
+        }),
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log(`✅ Successfully refreshed ${result.data.totalSaved} vehicles`)
+        setLastRefreshTime(new Date().toLocaleString())
+        // After refresh, fetch the updated vehicles
+        await fetchVehicles(1)
+      } else {
+        console.error('❌ Refresh failed:', result.message)
+      }
+    } catch (error) {
+      console.error('❌ Error during refresh:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Get available seller types
+  const fetchSellerTypes = async () => {
+    try {
+      console.log('🔍 Fetching seller types...')
+      const response = await fetch('/api/vehicles/refresh')
+      const result = await response.json()
+      console.log('📊 Seller types response:', result)
+      
+      if (result.success && result.data.availableSellerTypes) {
+        console.log('✅ Available seller types:', result.data.availableSellerTypes)
+        setAvailableSellerTypes(result.data.availableSellerTypes)
+      } else {
+        console.error('❌ Failed to get seller types:', result)
+        // Fallback to hardcoded list if API fails
+        const fallbackSellerTypes = [
+          "Auction", "Bank", "Captive Finance", "Car Rental",
+          "Credit Union", "Independent", "Franchise", "Fleet/Lease", 
+          "Finance", "Lease", "Government", "Insurance", "Manufacturer",
+          "Nonprofit", "Other", "Personal", "Repossession", "Trade"
+        ]
+        setAvailableSellerTypes(fallbackSellerTypes)
+      }
+    } catch (error) {
+      console.error('Error fetching seller types:', error)
+      // Fallback to hardcoded list if API fails
+      const fallbackSellerTypes = [
+        "Auction", "Bank", "Captive Finance", "Car Rental",
+        "Credit Union", "Independent", "Franchise", "Fleet/Lease", 
+        "Finance", "Lease", "Government", "Insurance", "Manufacturer",
+        "Nonprofit", "Other", "Personal", "Repossession", "Trade"
+      ]
+      setAvailableSellerTypes(fallbackSellerTypes)
+    }
+  }
 
   // Fetch vehicles with filters
   const fetchVehicles = async (page = 1) => {
@@ -103,7 +199,9 @@ export default function Home() {
 
       // Add only non-empty filters to reduce payload
       Object.entries(filters).forEach(([key, value]) => {
-        if (value !== '' && value !== false) {
+        if (key === 'sellerTypes' && Array.isArray(value) && value.length > 0) {
+          params[key] = value.join(',')
+        } else if (value !== '' && value !== false && !Array.isArray(value)) {
           params[key] = value.toString()
         }
       })
@@ -136,7 +234,21 @@ export default function Home() {
   }
 
   useEffect(() => {
-    fetchVehicles(1)
+    // Initialize application - load existing data first, then allow manual refresh
+    const initializeData = async () => {
+      console.log('🚀 Initializing application...')
+      
+      // Always fetch seller types first
+      await fetchSellerTypes()
+      
+      // Load existing vehicles from database (fast)
+      await fetchVehicles(1)
+      
+      // Don't auto-refresh on every load - user can manually refresh if needed
+      // This makes the app load much faster
+    }
+    
+    initializeData()
   }, [])
 
   useEffect(() => {
@@ -148,7 +260,7 @@ export default function Home() {
     return () => clearTimeout(timeoutId)
   }, [filters, sortBy])
 
-  const handleFilterChange = (key: keyof Filters, value: string | boolean) => {
+  const handleFilterChange = (key: keyof Filters, value: string | boolean | string[]) => {
     setFilters(prev => ({ ...prev, [key]: value }))
   }
 
@@ -169,7 +281,16 @@ export default function Home() {
       conditionGradeMin: '',
       carfaxClean: false,
       autoCheckClean: false,
-      conditionGradeMax: ''
+      conditionGradeMax: '',
+      sellerTypes: [],
+      mmrDifferenceMin: '',
+      auctionEndingSoon: false,
+      lowMileageOnly: false,
+      highValueOnly: false,
+      recentListings: false,
+      pickupRegion: '',
+      exteriorColor: '',
+      daysOnMarketMax: ''
     })
   }
 
@@ -246,6 +367,16 @@ export default function Home() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+              
+              {/* Refresh Data Button */}
+              <button
+                onClick={() => refreshData(filters.sellerTypes)}
+                disabled={refreshing}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Fetch fresh data from Manheim API (takes 2-3 minutes)"
+              >
+                {refreshing ? '🔄 Refreshing...' : '🔄 Refresh Data'}
+              </button>
               
               {/* Export Button */}
               <button
@@ -340,7 +471,129 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Removed Inventory Management section */}
+                {/* Seller Types Filter */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-gray-900">
+                      Seller Types ({availableSellerTypes.length} available)
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleFilterChange('sellerTypes', availableSellerTypes)}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-xs text-gray-400">|</span>
+                      <button
+                        onClick={() => handleFilterChange('sellerTypes', [])}
+                        className="text-xs text-red-600 hover:text-red-800"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2">
+                    {availableSellerTypes.length === 0 ? (
+                      <div className="text-sm text-gray-500 italic">Loading seller types...</div>
+                    ) : (
+                      availableSellerTypes.map((sellerType, index) => (
+                        <label key={`${sellerType}-${index}`} className="flex items-center py-1">
+                          <input
+                            type="checkbox"
+                            checked={filters.sellerTypes.includes(sellerType)}
+                            onChange={(e) => {
+                              const updatedTypes = e.target.checked
+                                ? [...filters.sellerTypes, sellerType]
+                                : filters.sellerTypes.filter(type => type !== sellerType)
+                              handleFilterChange('sellerTypes', updatedTypes)
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">{sellerType}</span>
+                        </label>
+                      ))
+                    )}
+                    {availableSellerTypes.length > 0 && (
+                      <div className="text-xs text-gray-400 pt-2 border-t">
+                        Total: {availableSellerTypes.length} seller types
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Smart Filters */}
+                <div className="border-t pt-4">
+                  <h3 className="font-medium text-gray-900 mb-3">Smart Filters</h3>
+                  <div className="space-y-3">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={filters.auctionEndingSoon}
+                        onChange={(e) => handleFilterChange('auctionEndingSoon', e.target.checked)}
+                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">🔥 Ending Soon (24h)</span>
+                    </label>
+                    
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={filters.lowMileageOnly}
+                        onChange={(e) => handleFilterChange('lowMileageOnly', e.target.checked)}
+                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">⭐ Low Mileage (&lt;30k)</span>
+                    </label>
+                    
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={filters.highValueOnly}
+                        onChange={(e) => handleFilterChange('highValueOnly', e.target.checked)}
+                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">💎 High Value (MMR &gt;$15k)</span>
+                    </label>
+                    
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={filters.recentListings}
+                        onChange={(e) => handleFilterChange('recentListings', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">🆕 Recent Listings (7 days)</span>
+                    </label>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Min MMR Difference ($)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 2000"
+                        value={filters.mmrDifferenceMin}
+                        onChange={(e) => handleFilterChange('mmrDifferenceMin', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Max Days on Market
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 30"
+                        value={filters.daysOnMarketMax}
+                        onChange={(e) => handleFilterChange('daysOnMarketMax', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {/* Basic Filters */}
                 <div className="border-t pt-4">
@@ -394,6 +647,111 @@ export default function Home() {
                         />
                       </div>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Year Range</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          placeholder="Min Year"
+                          value={filters.yearMin}
+                          onChange={(e) => handleFilterChange('yearMin', e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max Year"
+                          value={filters.yearMax}
+                          onChange={(e) => handleFilterChange('yearMax', e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Max Mileage</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50000"
+                        value={filters.mileageMax}
+                        onChange={(e) => handleFilterChange('mileageMax', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                      <select
+                        value={filters.location}
+                        onChange={(e) => handleFilterChange('location', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All Locations</option>
+                        {availableFilters.locations.map(location => (
+                          <option key={location} value={location}>{location}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Exterior Color</label>
+                      <select
+                        value={filters.exteriorColor}
+                        onChange={(e) => handleFilterChange('exteriorColor', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All Colors</option>
+                        {availableFilters.exteriorColors.map(color => (
+                          <option key={color} value={color}>{color}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Region</label>
+                      <select
+                        value={filters.pickupRegion}
+                        onChange={(e) => handleFilterChange('pickupRegion', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All Regions</option>
+                        {availableFilters.pickupRegions.map(region => (
+                          <option key={region} value={region}>{region}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Auction Status Filters */}
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={filters.buyNowOnly}
+                          onChange={(e) => handleFilterChange('buyNowOnly', e.target.checked)}
+                          className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">💰 Buy Now Available</span>
+                      </label>
+                      
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={filters.auctionOnly}
+                          onChange={(e) => handleFilterChange('auctionOnly', e.target.checked)}
+                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">🔨 At Auction</span>
+                      </label>
+                      
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={filters.salvageOnly}
+                          onChange={(e) => handleFilterChange('salvageOnly', e.target.checked)}
+                          className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">⚠️ Salvage Only</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
@@ -437,12 +795,25 @@ export default function Home() {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">AutoBuyer Inventory</h1>
-                {!loading && (
-                  <p className="text-gray-600 mt-1">
-                    {totalCount.toLocaleString()} vehicles found
+                {refreshing && (
+                  <p className="text-blue-600 mt-1 flex items-center">
+                    <span className="animate-spin mr-2">🔄</span>
+                    Refreshing data from Manheim API...
                   </p>
                 )}
-                {currentPage > 1 && (
+                {!loading && !refreshing && (
+                  <div className="mt-1">
+                    <p className="text-gray-600">
+                      {totalCount.toLocaleString()} vehicles found
+                    </p>
+                    {lastRefreshTime && (
+                      <p className="text-xs text-gray-500">
+                        Last updated: {lastRefreshTime}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {currentPage > 1 && !refreshing && (
                   <p className="text-sm text-gray-600">
                     Page {currentPage} of {Math.ceil(totalCount / 100)}
                   </p>
@@ -450,7 +821,11 @@ export default function Home() {
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Filter toggle removed */}
+                {filters.sellerTypes.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    🎯 {filters.sellerTypes.length} seller type(s) selected
+                  </div>
+                )}
               </div>
             </div>
 
