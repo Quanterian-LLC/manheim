@@ -97,15 +97,7 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     }
   }
 
-  const handleVinReport = () => {
-    if (vehicle.vinUrl) {
-      window.open(vehicle.vinUrl, '_blank')
-    } else {
-      // Generate a mock VIN report URL for demo purposes
-      const mockUrl = `https://www.carfax.com/VehicleHistory/p/Report.cfx?partner=DLR_3&vin=${vehicle.vin}`
-      window.open(mockUrl, '_blank')
-    }
-  }
+
 
   const handleWatchlist = async () => {
     try {
@@ -131,19 +123,7 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     return (
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
         <div className="flex items-center space-x-6">
-          {/* Vehicle Icon */}
-          <div className="relative flex-shrink-0">
-            <div className="w-32 h-24 rounded-lg bg-gray-100 flex items-center justify-center">
-              <span className="text-gray-400 text-3xl">🚗</span>
-            </div>
-            
-            {/* Status Badge */}
-            <div className="absolute top-1 left-1">
-              <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-xs">
-                {vehicle.status || 'Unknown'}
-              </span>
-            </div>
-          </div>
+
 
           {/* Vehicle Info */}
           <div className="flex-1 min-w-0">
@@ -251,19 +231,12 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
           {/* Action Buttons */}
           <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
-            <button 
-              onClick={handleConditionReport}
-              className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
-            >
-              Condition Report
-            </button>
-            
-            <button 
-              onClick={handleVinReport}
-              className="bg-orange-600 text-white text-sm py-2 rounded hover:bg-orange-700 transition-colors"
-            >
-              VIN Report
-            </button>
+                      <button 
+            onClick={handleConditionReport}
+            className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
+          >
+            Condition Report
+          </button>
             
             {vehicle.mComVdpUrl && (
               <button 
@@ -293,19 +266,7 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
-      {/* Vehicle Icon */}
-      <div className="relative mb-4">
-        <div className="w-full h-48 rounded-lg bg-gray-100 flex items-center justify-center">
-          <span className="text-gray-400 text-6xl">🚗</span>
-        </div>
-        
-        {/* Status Badge */}
-        <div className="absolute top-2 left-2">
-          <span className="bg-blue-600 text-white px-1 py-0.5 rounded text-xs">
-            {vehicle.status || 'Unknown'}
-          </span>
-        </div>
-      </div>
+
 
       {/* Vehicle Info */}
       <div className="space-y-3">
@@ -439,19 +400,12 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
         {/* Action Buttons */}
         <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
-          <button 
-            onClick={handleConditionReport}
-            className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
-          >
-            Condition Report
-          </button>
-          
-          <button 
-            onClick={handleVinReport}
-            className="bg-orange-600 text-white text-sm py-2 rounded hover:bg-orange-700 transition-colors"
-          >
-            VIN Report
-          </button>
+                      <button 
+              onClick={handleConditionReport}
+              className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
+            >
+              Condition Report
+            </button>
           
           {vehicle.mComVdpUrl && (
             <button 
