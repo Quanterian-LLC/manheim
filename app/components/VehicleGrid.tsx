@@ -16,28 +16,6 @@ interface VehicleGridProps {
 // Keep mock data as fallback
 const mockVehicles = [
   {
-    id: "OVE.BCAA.399641951",
-    make: "Ford",
-    models: ["Transit Connect"],
-    year: "2013",
-    bodyStyle: "Cargo Van",
-    odometer: 82702,
-    bidPrice: 4500,
-    buyNowPrice: 6700,
-    buyable: true,
-    atAuction: false,
-    auctionEndTime: "2025-06-16T20:00:00Z",
-    exteriorColor: "White",
-    locationCity: "Hayward",
-    locationZipcode: "94544",
-    titleBrandings: ["Salvage"],
-    salvageVehicle: true,
-    statuses: ["Live"],
-    vin: "NM0LS7CNXDT154708",
-    mmrPrice: 4350,
-    conditionGradeNumeric: 2.1,
-  },
-  {
     id: "OVE.BCAA.399641952",
     make: "Toyota",
     models: ["Camry"],

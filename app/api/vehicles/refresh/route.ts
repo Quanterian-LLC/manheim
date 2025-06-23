@@ -269,11 +269,11 @@ function processVehicleData(item: any, colorMap: Record<string, string>) {
     auctionStartTime: item.auctionStartTime || '',
     auctionEndTime: item.auctionEndTime || '',
     dallasTime: convertToDallasTime(item.auctionStartTime),
-    titleBrandings: ["Clean"], // Default
-    salvageVehicle: false,
-    salvage: false,
-    statuses: ["Live"], // Default
-    status: "Live",
+    titleBrandings: item.titleBrandings || ["Clean"], // Use actual title brandings
+    salvageVehicle: item.salvageVehicle || false, // Use actual salvage status
+    salvage: item.salvageVehicle || item.salvage || false, // Use actual salvage status
+    statuses: item.statuses || ["Live"], // Use actual status
+    status: (item.statuses && item.statuses[0]) || "Live", // Use first status or default
     daysOnMarket: Math.floor(Math.random() * 30) + 1, // Mock data
     importedAt: new Date(),
     apiSource: 'manheim_live_api'
@@ -354,10 +354,29 @@ async function fetchManheimDataFiltered(sellerTypes = DEFAULT_SELLER_TYPES) {
             break;
           }
           
-          // Process vehicles
-          const processedVehicles = results
-            .filter((item: any) => item.vin) // Only vehicles with VIN
-            .map((item: any) => processVehicleData(item, colorMap));
+          // Process vehicles with strict filtering
+          const filteredResults = results.filter((item: any) => {
+            // Apply strict quality filters
+            const hasVin = !!item.vin
+            const notSalvage = !item.salvageVehicle && !item.salvage
+            const odometerOK = item.odometerCheckOK !== false
+            const titleOK = item.titleAndProblemCheckOK !== false
+            const notAsIs = !item.asIs
+            const noFrameDamage = !item.hasFrameDamage
+            const notCanadian = !item.previouslyCanadianListing
+            
+            const passes = hasVin && notSalvage && odometerOK && titleOK && notAsIs && noFrameDamage && notCanadian
+            
+            if (!passes) {
+              console.log(`   🚫 Filtered out vehicle: VIN=${item.vin}, salvage=${item.salvageVehicle || item.salvage}, asIs=${item.asIs}, frameDamage=${item.hasFrameDamage}`)
+            }
+            
+            return passes
+          })
+          
+          const processedVehicles = filteredResults.map((item: any) => processVehicleData(item, colorMap))
+          
+          console.log(`   📋 Original: ${results.length}, Filtered: ${filteredResults.length}, Processed: ${processedVehicles.length}`);
           
           if (processedVehicles.length > 0) {
             try {

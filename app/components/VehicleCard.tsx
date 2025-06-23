@@ -97,6 +97,16 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     }
   }
 
+  const handleManheimDetails = () => {
+    if (vehicle.vin) {
+      // Open Manheim details page with dynamic VIN
+      const manheimUrl = `https://site.manheim.com/en/locations.html#/details/${vehicle.vin}/OVE`
+      window.open(manheimUrl, '_blank')
+    } else {
+      console.error('No VIN available for this vehicle')
+    }
+  }
+
 
 
   const handleWatchlist = async () => {
@@ -231,12 +241,20 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
           {/* Action Buttons */}
           <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
-                      <button 
-            onClick={handleConditionReport}
-            className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
-          >
-            Condition Report
-          </button>
+            <button 
+              onClick={handleManheimDetails}
+              className="bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition-colors"
+              title={`View on Manheim: ${vehicle.vin}`}
+            >
+              🏢 Manheim Details
+            </button>
+            
+            <button 
+              onClick={handleConditionReport}
+              className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
+            >
+              Condition Report
+            </button>
             
             {vehicle.mComVdpUrl && (
               <button 
@@ -400,12 +418,20 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
         {/* Action Buttons */}
         <div className="flex flex-col space-y-2 flex-shrink-0 w-32">
-                      <button 
-              onClick={handleConditionReport}
-              className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
-            >
-              Condition Report
-            </button>
+          <button 
+            onClick={handleManheimDetails}
+            className="bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition-colors"
+            title={`View on Manheim: ${vehicle.vin}`}
+          >
+            🏢 Manheim Details
+          </button>
+          
+          <button 
+            onClick={handleConditionReport}
+            className="bg-green-600 text-white text-sm py-2 rounded hover:bg-green-700 transition-colors"
+          >
+            Condition Report
+          </button>
           
           {vehicle.mComVdpUrl && (
             <button 
