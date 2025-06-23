@@ -98,14 +98,15 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
   }
 
   const handleManheimDetails = () => {
-    if (vehicle.vin) {
-      // Open Manheim details page with dynamic VIN
-      const manheimUrl = `https://site.manheim.com/en/locations.html#/details/${vehicle.vin}/OVE`
-      window.open(manheimUrl, '_blank')
+    if (vehicle.vinUrl) {
+      // Open the vinUrl from database
+      window.open(vehicle.vinUrl, '_blank')
     } else {
-      console.error('No VIN available for this vehicle')
+      console.error('No vinUrl available for this vehicle')
     }
   }
+
+
 
 
 
@@ -244,9 +245,9 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
             <button 
               onClick={handleManheimDetails}
               className="bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition-colors"
-              title={`View on Manheim: ${vehicle.vin}`}
+              title={`View Details: ${vehicle.vinUrl || 'No URL available'}`}
             >
-              🏢 Manheim Details
+              🏢 Vehicle Details
             </button>
             
             <button 
@@ -421,9 +422,9 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
           <button 
             onClick={handleManheimDetails}
             className="bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition-colors"
-            title={`View on Manheim: ${vehicle.vin}`}
+            title={`View Details: ${vehicle.vinUrl || 'No URL available'}`}
           >
-            🏢 Manheim Details
+            🏢 Vehicle Details
           </button>
           
           <button 

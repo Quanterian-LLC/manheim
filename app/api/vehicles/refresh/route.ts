@@ -232,7 +232,7 @@ function processVehicleData(item: any, colorMap: Record<string, string>) {
     source: item.source || '',
     saleDate: item.saleDate || '',
     vin: item.vin || '',
-    vinUrl: item.vin ? `https://www.ove.com/search/results#/details/${item.vin}/OVE` : '',
+    vinUrl: item.vin ? `https://search.manheim.com/results#/details/${item.vin}/OVE` : '',
     year: item.year || '',
     make: item.make || '',
     models: item.models || [],
