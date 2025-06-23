@@ -100,12 +100,22 @@ export async function GET(request: NextRequest) {
     const carfaxClean = searchParams.get('carfaxClean') === 'true'
     const autoCheckClean = searchParams.get('autoCheckClean') === 'true'
 
-    // Inventory management filters
+    // New intelligent filters
+    const sellerTypes = searchParams.get('sellerTypes')?.split(',').filter(Boolean) || []
+    const mmrDifferenceMin = searchParams.get('mmrDifferenceMin') || ''
+    const auctionEndingSoon = searchParams.get('auctionEndingSoon') === 'true'
+    const lowMileageOnly = searchParams.get('lowMileageOnly') === 'true'
+    const highValueOnly = searchParams.get('highValueOnly') === 'true'
+    const recentListings = searchParams.get('recentListings') === 'true'
+    const pickupRegion = searchParams.get('pickupRegion') || ''
+    const exteriorColor = searchParams.get('exteriorColor') || ''
+    const daysOnMarketMax = searchParams.get('daysOnMarketMax') || ''
+
+    // Legacy inventory management filters (kept for compatibility)
     const newListings = searchParams.get('newListings') === 'true'
     const needsRelisting = searchParams.get('needsRelisting') === 'true'
     const priceReductionNeeded = searchParams.get('priceReductionNeeded') === 'true'
     const daysOnMarketMin = searchParams.get('daysOnMarketMin') || ''
-    const daysOnMarketMax = searchParams.get('daysOnMarketMax') || ''
 
     // Removed specificCriteriaOnly filter
 
@@ -245,7 +255,77 @@ export async function GET(request: NextRequest) {
       query.autoCheckStatus = 'clean'
     }
 
-    // Inventory management filters
+    // New intelligent filters
+    if (sellerTypes.length > 0) {
+      query.sellerName = { $in: sellerTypes }
+    }
+    
+    if (mmrDifferenceMin) {
+      // MMR difference is calculated as mmrPrice - buyNowPrice, so positive means good deal
+      const mmrDiffCondition = {
+        $gte: [
+          {
+            $subtract: [
+              { $convert: { input: "$mmrPrice", to: "double", onError: 0, onNull: 0 } },
+              { $convert: { input: "$buyNowPrice", to: "double", onError: 0, onNull: 0 } }
+            ]
+          },
+          parseInt(mmrDifferenceMin)
+        ]
+      }
+      
+      if (query.$expr) {
+        query.$expr = { $and: [query.$expr, mmrDiffCondition] }
+      } else {
+        query.$expr = mmrDiffCondition
+      }
+    }
+    
+    if (auctionEndingSoon) {
+      // Auctions ending within 24 hours
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      query.auctionEndTime = { $lte: tomorrow.toISOString() }
+    }
+    
+    if (lowMileageOnly) {
+      query.odometer = { $lt: 30000 }
+    }
+    
+    if (highValueOnly) {
+      const highValueCondition = {
+        $gte: [
+          { $convert: { input: "$mmrPrice", to: "double", onError: 0, onNull: 0 } },
+          15000
+        ]
+      }
+      
+      if (query.$expr) {
+        query.$expr = { $and: [query.$expr, highValueCondition] }
+      } else {
+        query.$expr = highValueCondition
+      }
+    }
+    
+    if (recentListings) {
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      query.importedAt = { $gte: sevenDaysAgo }
+    }
+    
+    if (pickupRegion) {
+      query.pickupRegion = { $regex: `^${pickupRegion}$`, $options: 'i' }
+    }
+    
+    if (exteriorColor) {
+      query.exteriorColor = { $regex: exteriorColor, $options: 'i' }
+    }
+    
+    if (daysOnMarketMax) {
+      query.daysOnMarket = { ...(query.daysOnMarket || {}), $lte: parseInt(daysOnMarketMax) }
+    }
+
+    // Legacy inventory management filters
     if (newListings) {
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -356,20 +436,26 @@ export async function GET(request: NextRequest) {
       let filterOptions = {
         makes: [] as string[],
         bodyStyles: [] as string[],
-        locations: [] as string[]
+        locations: [] as string[],
+        pickupRegions: [] as string[],
+        exteriorColors: [] as string[]
       }
 
       if (!search && !make && !bodyStyle && !location) {
-        const [makes, bodyStyles, locations] = await Promise.all([
+        const [makes, bodyStyles, locations, pickupRegions, exteriorColors] = await Promise.all([
           collection.distinct('make', {}),
           collection.distinct('bodyStyle', {}),
-          collection.distinct('locationCity', {})
+          collection.distinct('locationCity', {}),
+          collection.distinct('pickupRegion', {}),
+          collection.distinct('exteriorColor', {})
         ])
         
         filterOptions = {
           makes: makes.filter(Boolean).sort(),
           bodyStyles: bodyStyles.filter(Boolean).sort(),
-          locations: locations.filter(Boolean).sort()
+          locations: locations.filter(Boolean).sort(),
+          pickupRegions: pickupRegions.filter(Boolean).sort(),
+          exteriorColors: exteriorColors.filter(Boolean).sort()
         }
       }
 
