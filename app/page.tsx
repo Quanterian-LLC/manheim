@@ -418,6 +418,7 @@ export default function Home() {
                   >
                     <option value="composite_score">🎯 Best Deals (High MMR + Low Condition)</option>
                     <option value="mmr_difference">MMR Difference: High to Low</option>
+                    <option value="mmr_difference_low">MMR Difference: Low to High</option>
                     <option value="condition_grade_low">Condition Grade: Low to High (Best Value)</option>
                     <option value="condition_grade_high">Condition Grade: High to Low</option>
                     <option value="price_low">Price: Low to High</option>
