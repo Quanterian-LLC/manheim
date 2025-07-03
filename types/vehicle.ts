@@ -50,7 +50,15 @@ export interface Vehicle {
   titleAndProblemCheckOK?: boolean
   previouslyCanadianListing?: boolean
   startBuyNowPrice?: number
-  images?: string[] | null
+  images?: Array<{
+    largeUrl: string
+    smallUrl: string
+    description?: string
+    angle?: string
+    dziUrl?: string
+    sequence?: number
+    category?: string
+  }> | null
   interiorColor?: string
   interiorColorCode?: string
   interiorColorIds?: string[]

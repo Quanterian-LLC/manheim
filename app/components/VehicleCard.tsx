@@ -2,6 +2,16 @@
 
 import React, { useState } from 'react'
 
+interface VehicleImage {
+  largeUrl: string
+  smallUrl: string
+  description?: string
+  angle?: string
+  dziUrl?: string
+  sequence?: number
+  category?: string
+}
+
 interface Vehicle {
   id: string
   make: string
@@ -33,6 +43,7 @@ interface Vehicle {
   mComVdpUrl?: string
   status?: string
   vinUrl?: string
+  images?: VehicleImage[]
 }
 
 interface VehicleCardProps {
@@ -134,7 +145,28 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
     return (
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
         <div className="flex items-center space-x-6">
-
+          {/* Vehicle Image */}
+          <div className="flex-shrink-0">
+            <div className="w-48 h-36 bg-gray-200 rounded-lg overflow-hidden">
+              {vehicle.images && vehicle.images.length > 0 ? (
+                <img
+                  src={vehicle.images[0].largeUrl}
+                  alt={`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || vehicle.model || 'Unknown Model'}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik03MCA3NUw4NSA2MEwxMTUgOTBMMTMwIDc1TDE1MCA5NVYxMjBINTBWOTVMNzAgNzVaIiBmaWxsPSIjOTlBM0FFII8+CjxjaXJjbGUgY3g9IjE3MCIgY3k9IjMwIiByPSIxMCIgZmlsbD0iIzk5QTNBRSIvPgo8dGV4dCB4PSIxMDAiIHk9IjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K'
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-gray-400 text-4xl mb-2">📷</div>
+                    <div className="text-gray-500 text-sm">No Image</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Vehicle Info */}
           <div className="flex-1 min-w-0">
@@ -150,7 +182,13 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
                   VIN: {vehicle.vin || 'N/A'}
                 </p>
                 <p className="text-green-600 text-xs mt-1 font-medium">
-                  Condition Grade: {vehicle.conditionGradeNumeric ? Number(vehicle.conditionGradeNumeric).toFixed(1) : 'N/A'}/5.0
+                  <span 
+                    onClick={handleConditionReport}
+                    className="cursor-pointer hover:underline hover:text-green-700 transition-colors"
+                    title="Click to view condition report"
+                  >
+                    Condition Grade: {vehicle.conditionGradeNumeric ? Number(vehicle.conditionGradeNumeric).toFixed(1) : 'N/A'}/5.0
+                  </span>
                 </p>
                 {vehicle.sellerName && (
                   <p className="text-blue-600 text-xs mt-1 font-medium">
@@ -285,7 +323,28 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6">
-
+      {/* Vehicle Image */}
+      <div className="mb-4">
+        <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden">
+          {vehicle.images && vehicle.images.length > 0 ? (
+            <img
+              src={vehicle.images[0].largeUrl}
+              alt={`${vehicle.year} ${vehicle.make} ${vehicle.models?.[0] || vehicle.model || 'Unknown Model'}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMDUgMTAwTDEyNSA4MEwxNzUgMTMwTDE5NSAxMTBMMjI1IDEzMFYxNjBINzVWMTMwTDEwNSAxMDBaIiBmaWxsPSIjOTlBM0FFII8+CjxjaXJjbGUgY3g9IjI1NSIgY3k9IjQ1IiByPSIxNSIgZmlsbD0iIzk5QTNBRSIvPgo8dGV4dCB4PSIxNTAiIHk9IjExMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjNkI3MjgwIj5ObyBJbWFnZTwvdGV4dD4KPC9zdmc+Cg=='
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-gray-400 text-6xl mb-2">📷</div>
+                <div className="text-gray-500 text-sm">No Image Available</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Vehicle Info */}
       <div className="space-y-3">
@@ -300,7 +359,13 @@ export default function VehicleCard({ vehicle, listView = false }: VehicleCardPr
             VIN: {vehicle.vin || 'N/A'}
           </p>
           <p className="text-green-600 text-xs mt-1 font-medium">
-            Condition Grade: {vehicle.conditionGradeNumeric ? Number(vehicle.conditionGradeNumeric).toFixed(1) : 'N/A'}/5.0
+            <span 
+              onClick={handleConditionReport}
+              className="cursor-pointer hover:underline hover:text-green-700 transition-colors"
+              title="Click to view condition report"
+            >
+              Condition Grade: {vehicle.conditionGradeNumeric ? Number(vehicle.conditionGradeNumeric).toFixed(1) : 'N/A'}/5.0
+            </span>
           </p>
           {vehicle.sellerName && (
             <p className="text-blue-600 text-xs mt-1 font-medium">
