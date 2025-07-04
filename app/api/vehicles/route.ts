@@ -532,7 +532,8 @@ export async function GET(request: NextRequest) {
           mComVdpUrl: vehicle.mComVdpUrl || null,
           status: status,
           conditionReportUrl: vehicle.conditionReportUrl || null,
-          vinUrl: vehicle.vinUrl || null
+          vinUrl: vehicle.vinUrl || null,
+          images: vehicle.images || [] // Add images field
         }
       })
 
@@ -596,7 +597,15 @@ export async function GET(request: NextRequest) {
           lastPriceUpdate: '2024-01-10T10:00:00Z',
           conditionReportUrl: 'https://inspectionreport.manheim.com/?CLIENT=SIMUC&channel=OVE&disclosureid=1&listingID=1',
           mComVdpUrl: 'https://search.manheim.com/results#/details/1HGBH41JXMN109186/OVE',
-          vinUrl: 'https://www.carfax.com/VehicleHistory/p/Report.cfx?partner=DLR_3&vin=1HGBH41JXMN109186'
+          vinUrl: 'https://www.carfax.com/VehicleHistory/p/Report.cfx?partner=DLR_3&vin=1HGBH41JXMN109186',
+          images: [
+            {
+              largeUrl: 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+              smallUrl: 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80',
+              description: 'Front view',
+              sequence: 1
+            }
+          ]
         },
         {
           id: '2',
